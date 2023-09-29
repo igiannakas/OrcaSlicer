@@ -2026,6 +2026,12 @@ void PerimeterGenerator::process_arachne()
          printf("New Layer: Layer ID %d\n",layer_id); //debug - new layer
         if (this->config->wall_infill_order == WallInfillOrder::InnerOuterInnerInfill && layer_id > 0) { // only enable inner outer inner algorithm after first layer
             if (ordered_extrusions.size() > 2) { // 3 walls minimum needed to do inner outer inner ordering
+                
+                
+                
+                
+                
+                
                 int position = 0; // index to run the re-ordering for multiple external perimeters in a single island.
                 int arr_i, arr_j = 0;    // indexes to run through the walls in the for loops
                 int outer, first_internal, second_internal, max_internal, current_perimeter; // allocate index values
@@ -2045,8 +2051,10 @@ void PerimeterGenerator::process_arachne()
                                     outer = arr_i;
                                 break;
                             case 1: // first internal wall
-                                if (first_internal==-1 && arr_i>outer && outer!=-1)
+                                if (first_internal==-1 && arr_i>outer && outer!=-1){
                                     first_internal = arr_i;
+                                }
+                                if(second_internal!=-1) second_internal = -1; // if we have already found a second internal perimeter, reset it and continue scanning for second internals as we have just found a new first internal
                                 break;
                             case 2: // second internal wall
                                 if (second_internal == -1 && arr_i > first_internal && outer!=-1){
@@ -2054,12 +2062,10 @@ void PerimeterGenerator::process_arachne()
                                 }
                                 break;
                         }
-                        if(outer >-1 && first_internal>-1 && second_internal>-1){ // found all three perimeters to re-order
-                            if(ordered_extrusions[arr_i].extrusion->inset_idx == 0){ // found a new external perimeter -> this means we entered a new island.
-                                arr_i=arr_i-1; //step back one perimeter
-                                max_internal = arr_i; // new maximum internal perimeter is now this as we have found a new external perimeter, hence a new island.
-                                break; // exit the for loop
-                            }
+                        if(ordered_extrusions[arr_i].extrusion->inset_idx == 0 && arr_i>position){ // found a new external perimeter -> this means we entered a new island.
+                            arr_i=arr_i-1; //step back one perimeter
+                            max_internal = arr_i; // new maximum internal perimeter is now this as we have found a new external perimeter, hence a new island.
+                            break; // exit the for loop
                         }
                     }
                     
@@ -2072,41 +2078,35 @@ void PerimeterGenerator::process_arachne()
                         for (arr_j = max_internal; arr_j >=position; --arr_j){ // go inside out towards the external perimeter (perimeters in reverse order) and store all internal perimeters until the first one identified with inset index 2
                             if(arr_j >= second_internal){
                                 printf("Inside out loop: Mapped perimeter index %d to array position %d\n", arr_j, max_internal-arr_j);
+                               
+                                /* //code to check if any second internal is touching an external perimeter
                                 Arachne::ExtrusionLine *el = ordered_extrusions[arr_j].extrusion;
-                                
-                                
                                 Polyline *internal_path = new Polyline();
                                 Polyline *external_path = new Polyline();
                                 bool lines_touching = false;
                                 
-                                for (const Arachne::ExtrusionJunction& junction : ordered_extrusions[arr_j].extrusion->junctions) {
-                                    internal_path->append(junction.p);
-                                }
-                                auto ll = internal_path->lines();
+                                for (const Arachne::ExtrusionJunction& junction : ordered_extrusions[arr_j].extrusion->junctions) internal_path->append(junction.p);
+                                for (const Arachne::ExtrusionJunction& junction : ordered_extrusions[outer].extrusion->junctions) external_path->append(junction.p);
+
                                 AABBTreeLines::LinesDistancer<Line> lines_internal{internal_path->lines()};
-                                
-                                
-                                for (const Arachne::ExtrusionJunction& junction : ordered_extrusions[outer].extrusion->junctions) {
-                                    external_path->append(junction.p);
-                                }
-                                auto ll2 = external_path->lines();
                                 AABBTreeLines::LinesDistancer<Line> lines_external{external_path->lines()};
                                 
-                                for (size_t pt_idx = 0; pt_idx < internal_path->size(); pt_idx++) {
-                                    if (lines_external.distance_from_lines<false>(internal_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) {
+                                for (size_t pt_idx = 0; pt_idx < internal_path->size(); pt_idx++)
+                                    if (lines_external.distance_from_lines<false>(internal_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.8f)) {
                                         lines_touching = true;
                                     }
-                                }
                                 
-                                for (size_t pt_idx = 0; pt_idx < external_path->size(); pt_idx++) {
-                                    if (lines_internal.distance_from_lines<false>(external_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) {
+                                
+                                for (size_t pt_idx = 0; pt_idx < external_path->size(); pt_idx++)
+                                    if (lines_internal.distance_from_lines<false>(external_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.8f)) {
                                         lines_touching = true;
                                     }
-                                }
+                                
                                 
                                 if(lines_touching){
                                     printf("LINES TOUCHING. LayerID %d, Perimeter index %d\n", layer_id, arr_j);
-                                }
+                                   // std::swap(ordered_extrusions[arr_j], ordered_extrusions[arr_j-1]);
+                                }*/
                                 
                                 inner_outer_extrusions[max_internal-arr_j] = ordered_extrusions[arr_j];
                                 current_perimeter++;
