@@ -2095,12 +2095,17 @@ void PerimeterGenerator::process_arachne()
                                 for (size_t pt_idx = 0; pt_idx < internal_path->size(); pt_idx++) {
                                     if (lines_external.distance_from_lines<false>(internal_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) {
                                         lines_touching = true;
-                                        printf("LINES TOUCHING\n");
+                                    }
+                                }
+                                
+                                for (size_t pt_idx = 0; pt_idx < external_path->size(); pt_idx++) {
+                                    if (lines_internal.distance_from_lines<false>(external_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) {
+                                        lines_touching = true;
                                     }
                                 }
                                 
                                 if(lines_touching){
-                                    printf("");
+                                    printf("LINES TOUCHING. LayerID %d, Perimeter index %d\n", layer_id, arr_j);
                                 }
                                 
                                 inner_outer_extrusions[max_internal-arr_j] = ordered_extrusions[arr_j];
