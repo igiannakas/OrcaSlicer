@@ -2026,12 +2026,6 @@ void PerimeterGenerator::process_arachne()
          printf("New Layer: Layer ID %d\n",layer_id); //debug - new layer
         if (this->config->wall_infill_order == WallInfillOrder::InnerOuterInnerInfill && layer_id > 0) { // only enable inner outer inner algorithm after first layer
             if (ordered_extrusions.size() > 2) { // 3 walls minimum needed to do inner outer inner ordering
-                
-                
-                
-                
-                
-                
                 int position = 0; // index to run the re-ordering for multiple external perimeters in a single island.
                 int arr_i, arr_j = 0;    // indexes to run through the walls in the for loops
                 int outer, first_internal, second_internal, max_internal, current_perimeter; // allocate index values
@@ -2170,19 +2164,6 @@ void PerimeterGenerator::process_arachne()
         this->fill_surfaces->append(infill_exp, stInternal);
 
         apply_extra_perimeters();
-        
-       // Slic3r::ExtrusionEntityCollection *pt = dynamic_cast<Slic3r::ExtrusionEntityCollection *>(loops->entities[0]);
-        
-        //if (pt && layer_id == 142) {
-            // Successful cast
-        //    Slic3r::ExtrusionPaths pt0 = pt->ExtrusionEntityCollection::operator ExtrusionPaths();
-
-            //Slic3r::ExtrusionPathsContainer *pt1 = dynamic_cast<Slic3r::ExtrusionPathsContainer *>(pt->entities[1]);
-       //}
-        
-      //  for (int tr=0; tr < loops->entities.size()-1, ++tr){
-           // ExtrusionPath * path1 = loops->entities[0]->entities[0]->paths[0];
-        //}
 
         // BBS: get the no-overlap infill expolygons
         {
