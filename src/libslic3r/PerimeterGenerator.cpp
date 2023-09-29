@@ -862,6 +862,8 @@ void PerimeterGenerator::split_top_surfaces(const ExPolygons &orig_polygons, ExP
 // find out if paths touch - at least one point of one path is within limit distance of second path
 bool paths_touch(const ExtrusionPath &path_one, const ExtrusionPath &path_two, double limit_distance)
 {
+    auto test = path_two.as_polyline().lines();
+    auto test2 = path_two.as_polyline();
     AABBTreeLines::LinesDistancer<Line> lines_two{path_two.as_polyline().lines()};
     for (size_t pt_idx = 0; pt_idx < path_one.polyline.size(); pt_idx++) {
         if (lines_two.distance_from_lines<false>(path_one.polyline.points[pt_idx]) < limit_distance) { return true; }
@@ -2021,84 +2023,102 @@ void PerimeterGenerator::process_arachne()
             }
         }
 
-		printf("New Layer: Layer ID %d\n",layer_id); //debug - new layer
-		printf("Number of extrusions found: %d\n",ordered_extrusions.size());
+         printf("New Layer: Layer ID %d\n",layer_id); //debug - new layer
         if (this->config->wall_infill_order == WallInfillOrder::InnerOuterInnerInfill && layer_id > 0) { // only enable inner outer inner algorithm after first layer
-        	
             if (ordered_extrusions.size() > 2) { // 3 walls minimum needed to do inner outer inner ordering
                 int position = 0; // index to run the re-ordering for multiple external perimeters in a single island.
                 int arr_i, arr_j = 0;    // indexes to run through the walls in the for loops
-                int outer, first_internal, second_internal, second_internal_contour, max_internal, current_perimeter; // allocate index values
-                // scan to find the external perimeter, first internal, second internal and last perimeter in the island                  
+                int outer, first_internal, second_internal, max_internal, current_perimeter; // allocate index values
+                // scan to find the external perimeter, first internal, second internal and last perimeter in the island
                 while (position < ordered_extrusions.size()) {
-                    outer = first_internal = second_internal = second_internal_contour = current_perimeter = -1; // initialise all index values to -1
+                    outer = first_internal = second_internal = current_perimeter = -1; // initialise all index values to -1
                     max_internal = ordered_extrusions.size()-1; // initialise the maximum internal perimeter to the last perimeter on the extrusion list
                     // run through the walls to get the index values that need re-ordering until the first one for each
                     // is found. Start at "position" index to enable the for loop to iterate for multiple external
                     // perimeters in a single island
-		    		 printf("Reorder Loop. Position %d, extrusion list size: %d, Outer index %d, inner index %d, second inner index %d\n", position, ordered_extrusions.size(),outer,first_internal,second_internal);
+                     printf("Reorder Loop. Position %d, extrusion list size: %d, Outer index %d, inner index %d, second inner index %d\n", position, ordered_extrusions.size(),outer,first_internal,second_internal);
                     for (arr_i = position; arr_i < ordered_extrusions.size(); ++arr_i) {
-					  printf("Perimeter: extrusion inset index %d, ordered extrusions array position %d\n",ordered_extrusions[arr_i].extrusion->inset_idx, arr_i);
+                         printf("Perimeter: extrusion inset index %d, ordered extrusions array position %d\n",ordered_extrusions[arr_i].extrusion->inset_idx, arr_i);
                         switch (ordered_extrusions[arr_i].extrusion->inset_idx) {
-                        	case 0: // external perimeter
-                            	if (outer == -1)
-                                	outer = arr_i;
-                            	break;
-                        	case 1: // first internal wall
-                            	if (first_internal==-1 && arr_i>outer && outer!=-1){
-                                	first_internal = arr_i;
-                                	Point ext_start_position = ordered_extrusions[outer].extrusion->junctions.front().p;
-                                	Point current_pos = ordered_extrusions[first_internal].extrusion->junctions.back().p;
-                                	double dist_sqr = (current_pos - ext_start_position).cast<double>().norm();
-                                	printf("F1: 1st Internal - Distance from external: %f.\n",dist_sqr);
-                                }
-                            	break;
+                            case 0: // external perimeter
+                                if (outer == -1)
+                                    outer = arr_i;
+                                break;
+                            case 1: // first internal wall
+                                if (first_internal==-1 && arr_i>outer && outer!=-1)
+                                    first_internal = arr_i;
+                                break;
                             case 2: // second internal wall
                                 if (second_internal == -1 && arr_i > first_internal && outer!=-1){
                                     second_internal = arr_i;
-                                    Point ext_start_position = ordered_extrusions[outer].extrusion->junctions.front().p;
-                                	Point current_pos = ordered_extrusions[second_internal].extrusion->junctions.back().p;
-                                	double dist_sqr = (current_pos - ext_start_position).cast<double>().norm();
-                                	printf("F0: 2nd Internal - Distance from external: %f.\n",dist_sqr);
-                                    break;
-                                }
-                                if(arr_i > first_internal && outer!=-1){
-                                       Point ext_start_position = ordered_extrusions[outer].extrusion->junctions.front().p;
-                                       Point current_second_internal_end_position = ordered_extrusions[second_internal].extrusion->junctions.back().p;
-                                       Point candidate_second_internal_end_position = ordered_extrusions[arr_i].extrusion->junctions.back().p;
-                                       
-                                       double cur_distance_sqr = (current_second_internal_end_position - ext_start_position).cast<double>().norm();
-                                       double candidate_distance_sqr = (candidate_second_internal_end_position - ext_start_position).cast<double>().norm();
-                                       printf("F1: 2nd Internal - Distance from external Original: %f New: %f. Extrusion length %d\n",cur_distance_sqr,candidate_distance_sqr, ordered_extrusions[arr_i].extrusion->getLength());
-                                       
-                                       if(candidate_distance_sqr < cur_distance_sqr){
-                                           //if(layer_id == 63)
-                                           //second_internal = arr_i;
-                                           printf("reordered! \n");
-                                       }
-                                    break;
                                 }
                                 break;
                         }
-                        
-                        if (outer >-1 && first_internal>-1 && second_internal>-1 && ordered_extrusions[arr_i].extrusion->inset_idx == 0) { 
-                        		// found all three perimeters to re-order
-								// found a new external perimeter -> this means we entered a new island.
-                        	    arr_i=arr_i-1; //step back one perimeter
-                        		max_internal = arr_i; // new maximum internal perimeter is now this as we have found a new external perimeter, hence a new island.
-                        		break; // exit the for loop
+                        if(outer >-1 && first_internal>-1 && second_internal>-1){ // found all three perimeters to re-order
+                            if(ordered_extrusions[arr_i].extrusion->inset_idx == 0){ // found a new external perimeter -> this means we entered a new island.
+                                arr_i=arr_i-1; //step back one perimeter
+                                max_internal = arr_i; // new maximum internal perimeter is now this as we have found a new external perimeter, hence a new island.
+                                break; // exit the for loop
+                            }
                         }
                     }
                     
+                     printf("Layer ID %d, Outer index %d, inner index %d, second inner index %d, maximum internal perimeter %d \n",layer_id,outer,first_internal,second_internal, max_internal);
                     if (outer > -1 && first_internal > -1 && second_internal > -1) { // found perimeters to re-order?
-                        printf("Reordering: Layer ID %d, Outer index %d, inner index %d, second inner index %d, maximum internal perimeter %d \n",layer_id,outer,first_internal,second_internal, max_internal);
-                        const auto temp = ordered_extrusions[second_internal];
-                        ordered_extrusions[second_internal] = ordered_extrusions[first_internal];
-                        ordered_extrusions[first_internal] = ordered_extrusions[outer];
-                        ordered_extrusions[outer] = temp;
+                        std::vector<PerimeterGeneratorArachneExtrusion> inner_outer_extrusions; // temporary array to hold extrusions for reordering
+                        inner_outer_extrusions.reserve(max_internal - position + 1); // reserve array containing the number of perimeters before a new island. Variables are array indexes hence need to add +1 to convert to position allocations
+                         printf("Allocated array size %d, max_internal index %d, start position index %d \n",max_internal-position+1,max_internal,position);
+                        
+                        for (arr_j = max_internal; arr_j >=position; --arr_j){ // go inside out towards the external perimeter (perimeters in reverse order) and store all internal perimeters until the first one identified with inset index 2
+                            if(arr_j >= second_internal){
+                                printf("Inside out loop: Mapped perimeter index %d to array position %d\n", arr_j, max_internal-arr_j);
+                                Arachne::ExtrusionLine *el = ordered_extrusions[arr_j].extrusion;
+                                
+                                
+                                Polyline *internal_path = new Polyline();
+                                Polyline *external_path = new Polyline();
+                                bool lines_touching = false;
+                                
+                                for (const Arachne::ExtrusionJunction& junction : ordered_extrusions[arr_j].extrusion->junctions) {
+                                    internal_path->append(junction.p);
+                                }
+                                auto ll = internal_path->lines();
+                                AABBTreeLines::LinesDistancer<Line> lines_internal{internal_path->lines()};
+                                
+                                
+                                for (const Arachne::ExtrusionJunction& junction : ordered_extrusions[outer].extrusion->junctions) {
+                                    external_path->append(junction.p);
+                                }
+                                auto ll2 = external_path->lines();
+                                AABBTreeLines::LinesDistancer<Line> lines_external{external_path->lines()};
+                                
+                                for (size_t pt_idx = 0; pt_idx < internal_path->size(); pt_idx++) {
+                                    if (lines_external.distance_from_lines<false>(internal_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) {
+                                        lines_touching = true;
+                                        printf("LINES TOUCHING\n");
+                                    }
+                                }
+                                
+                                if(lines_touching){
+                                    printf("");
+                                }
+                                
+                                inner_outer_extrusions[max_internal-arr_j] = ordered_extrusions[arr_j];
+                                current_perimeter++;
+                                
+                            }
+                        }
+                        
+                        for (arr_j = position; arr_j < second_internal; ++arr_j){ // go outside in and map the remaining perimeters (external and first internal wall(s)) using the outside in wall order
+                             printf("Outside in loop: Mapped perimeter index %d to array position %d\n", arr_j, current_perimeter+1);
+                            inner_outer_extrusions[++current_perimeter] = ordered_extrusions[arr_j];
+                        }
+                        
+                        for(arr_j = position; arr_j <= max_internal; ++arr_j) // replace perimeter array with the new re-ordered array
+                            ordered_extrusions[arr_j] = inner_outer_extrusions[arr_j-position];
                     } else
-                        break; // did not find any more candidates to re-order, so stop the while loop early
-
+                        break;
+                    // go to the next perimeter to continue scanning for external walls in the same island
                     position = arr_i + 1;
                 }
             }
@@ -2145,6 +2165,19 @@ void PerimeterGenerator::process_arachne()
         this->fill_surfaces->append(infill_exp, stInternal);
 
         apply_extra_perimeters();
+        
+       // Slic3r::ExtrusionEntityCollection *pt = dynamic_cast<Slic3r::ExtrusionEntityCollection *>(loops->entities[0]);
+        
+        //if (pt && layer_id == 142) {
+            // Successful cast
+        //    Slic3r::ExtrusionPaths pt0 = pt->ExtrusionEntityCollection::operator ExtrusionPaths();
+
+            //Slic3r::ExtrusionPathsContainer *pt1 = dynamic_cast<Slic3r::ExtrusionPathsContainer *>(pt->entities[1]);
+       //}
+        
+      //  for (int tr=0; tr < loops->entities.size()-1, ++tr){
+           // ExtrusionPath * path1 = loops->entities[0]->entities[0]->paths[0];
+        //}
 
         // BBS: get the no-overlap infill expolygons
         {
