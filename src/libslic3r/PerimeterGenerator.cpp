@@ -2096,12 +2096,13 @@ void PerimeterGenerator::process_arachne()
                                     Point current_second_internal_end_position = reordered_extrusions[second_internal].extrusion->junctions.back().p;
                                     double cur_distance_sqr = (current_second_internal_end_position - ext_start_position).cast<double>().norm();
                                     
+                                    printf("Current distance: Layer: %d, distance %f\n", layer_id, cur_distance_sqr);
                                     int closer_perimeter = -1;
                                     for(int closer_second_intenal = second_internal + 1;closer_second_intenal < reordered_extrusions.size(); ++closer_second_intenal){
     
                                         Point candidate_second_internal_end_position = reordered_extrusions[closer_second_intenal].extrusion->junctions.back().p;
                                         double candidate_distance_sqr = (candidate_second_internal_end_position - ext_start_position).cast<double>().norm();
-                                        //printf("Scanning for closer perimeters. LayerID: %d, perimeter:%d \n", layer_id+1, closer_second_intenal);
+                                        printf("Scanning for closer perimeters. LayerID: %d, perimeter:%d, distance %f \n", layer_id, closer_second_intenal, candidate_distance_sqr);
                                         if(candidate_distance_sqr < cur_distance_sqr && reordered_extrusions[closer_second_intenal].extrusion->inset_idx == 2 ){
                                             printf("REORDERED! LayerID: %d Original Distance: %f New Distance: %f, array position:  %d\n",layer_id, cur_distance_sqr,candidate_distance_sqr, closer_second_intenal);
                                             cur_distance_sqr = candidate_distance_sqr;
@@ -2109,7 +2110,7 @@ void PerimeterGenerator::process_arachne()
                                         }
                                     }
                                     if(closer_perimeter > -1){
-                                        printf("REORDERED! External Perimeter Index: %d LayerID: %d\n, Original Perimeter: %d, New Perimeter %d\n",outer, layer_id, second_internal, closer_perimeter);
+                                        printf("REORDERED! External Perimeter Index: %d LayerID: %d, Original Perimeter: %d, New Perimeter %d\n",outer, layer_id, second_internal, closer_perimeter);
                                         std::swap(reordered_extrusions[closer_perimeter],reordered_extrusions[second_internal]);
                                     }
                                 }
