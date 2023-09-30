@@ -2032,8 +2032,8 @@ void PerimeterGenerator::process_arachne()
                 
                 // Initiate reorder sequence to bring any index 1 (first internal) perimeters ahead of any second internal perimeters
                 // Leaving these out of order will result in print defects on the external wall as they will be extruded prior to any
-                // external wall. To do the re-ordering, we are creating two extrusion arrays - reordered_extrusions whihc will contain
-                // the reordered extrusions and skipped_extrusions will contain the ones that were skipped in the initial scanning
+                // external wall. To do the re-ordering, we are creating two extrusion arrays - reordered_extrusions which will contain
+                // the reordered extrusions and skipped_extrusions will contain the ones that were skipped in the scan
                 std::vector<PerimeterGeneratorArachneExtrusion> reordered_extrusions, skipped_extrusions;
                 bool found_second_internal = false; // helper variable to indicate the start of a new island
                 
