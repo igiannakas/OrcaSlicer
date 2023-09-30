@@ -2057,7 +2057,7 @@ void PerimeterGenerator::process_arachne()
                     }
                 }
                 if(ordered_extrusions.size()>reordered_extrusions.size()){
-                    // we didnt find a new island, so lets move the remaining perimeters to the reordered extrusions list.
+                    // we didnt find any more islands, so lets move the remaining skipped perimeters to the reordered extrusions list.
                     for(auto extrusion_skipped : skipped_extrusions)
                         reordered_extrusions.emplace_back(extrusion_skipped);
                     skipped_extrusions.clear();
