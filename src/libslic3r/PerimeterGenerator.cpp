@@ -2029,6 +2029,35 @@ void PerimeterGenerator::process_arachne()
                 int position = 0; // index to run the re-ordering for multiple external perimeters in a single island.
                 int arr_i, arr_j = 0;    // indexes to run through the walls in the for loops
                 int outer, first_internal, second_internal, max_internal, current_perimeter; // allocate index values
+                
+                //initiate reorder sequence to bring any index 1 (first internal) perimeters ahead of any second internal perimeters
+                //These may result in print defects if left present after a second internal perimeter is extruded.
+                //Create two extrusion arrays - reordered_extrusions will contain the reordered extrusions, skipped_extrusions
+                //will contain the ones that were skipped in the initial scanning
+                std::vector<PerimeterGeneratorArachneExtrusion> reordered_extrusions, skipped_extrusions;
+                bool found_second_internal = false;
+                
+                for(arr_i=0; arr_i<ordered_extrusions.size(); ++arr_i){ //scan the perimeters to reorder
+                    switch (ordered_extrusions[arr_i].extrusion->inset_idx) {
+                        case 0: // external perimeter
+                            reordered_extrusions.emplace_back(ordered_extrusions[arr_i]);
+                            if(found_second_internal){//new island - move skipped extrusions to reordered array
+                                for(auto extrusion_tmp : skipped_extrusions)
+                                    reordered_extrusions.emplace_back(extrusion_tmp);
+                                skipped_extrusions.clear();
+                            }
+                            break;
+                        case 1: // first internal perimeter
+                            reordered_extrusions.emplace_back(ordered_extrusions[arr_i]);
+                            break;
+                        default: // second internal+ perimeter
+                            skipped_extrusions.emplace_back(ordered_extrusions[arr_i]);
+                            found_second_internal = true;
+                            break;
+                    }
+                }
+                
+
                 // scan to find the external perimeter, first internal, second internal and last perimeter in the island
                 while (position < ordered_extrusions.size()) {
                     outer = first_internal = second_internal = current_perimeter = -1; // initialise all index values to -1
