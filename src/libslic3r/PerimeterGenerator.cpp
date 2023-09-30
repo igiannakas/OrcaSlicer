@@ -2062,12 +2062,11 @@ void PerimeterGenerator::process_arachne()
                         reordered_extrusions.emplace_back(extrusion_skipped);
                     skipped_extrusions.clear();
                 }
-                
-                // scan perimeters to re-order the first second internal to be the closest to the first external.
-
-                
+                                
                 // Now start the sandwich mode wall re-ordering using the reordered_extrusions as the basis
-                // scan to find the external perimeter, first internal, second internal and last perimeter in the island
+                // scan to find the external perimeter, first internal, second internal and last perimeter in the island.
+                // We then advance the position index to move to the second island and continue until there are no more
+                // perimeters left.
                 while (position < reordered_extrusions.size()) {
                     outer = first_internal = second_internal = current_perimeter = -1; // initialise all index values to -1
                     max_internal = reordered_extrusions.size()-1; // initialise the maximum internal perimeter to the last perimeter on the extrusion list
@@ -2090,6 +2089,29 @@ void PerimeterGenerator::process_arachne()
                             case 2: // second internal wall
                                 if (second_internal == -1 && arr_i > first_internal && outer!=-1){
                                     second_internal = arr_i;
+                                    // start scanning remaining second internal perimeters in case there is any perimeter that
+                                    // has an end position closer to the first external perimeter starting position.
+                                    // If one is found, swap positions with the currently identified second internal perimeter
+                                    Point ext_start_position = reordered_extrusions[outer].extrusion->junctions[0].p;
+                                    Point current_second_internal_end_position = reordered_extrusions[second_internal].extrusion->junctions.back().p;
+                                    double cur_distance_sqr = (current_second_internal_end_position - ext_start_position).cast<double>().norm();
+                                    
+                                    int closer_perimeter = -1;
+                                    for(int closer_second_intenal = second_internal + 1;closer_second_intenal < reordered_extrusions.size(); ++closer_second_intenal){
+    
+                                        Point candidate_second_internal_end_position = reordered_extrusions[closer_second_intenal].extrusion->junctions.back().p;
+                                        double candidate_distance_sqr = (candidate_second_internal_end_position - ext_start_position).cast<double>().norm();
+                                        //printf("Scanning for closer perimeters. LayerID: %d, perimeter:%d \n", layer_id+1, closer_second_intenal);
+                                        if(candidate_distance_sqr < cur_distance_sqr && reordered_extrusions[closer_second_intenal].extrusion->inset_idx == 2 ){
+                                            printf("REORDERED! LayerID: %d Original Distance: %f New Distance: %f, array position:  %d\n",layer_id, cur_distance_sqr,candidate_distance_sqr, closer_second_intenal);
+                                            cur_distance_sqr = candidate_distance_sqr;
+                                            closer_perimeter = closer_second_intenal;
+                                        }
+                                    }
+                                    if(closer_perimeter > -1){
+                                        printf("REORDERED! External Perimeter Index: %d LayerID: %d\n, Original Perimeter: %d, New Perimeter %d\n",outer, layer_id, second_internal, closer_perimeter);
+                                        std::swap(reordered_extrusions[closer_perimeter],reordered_extrusions[second_internal]);
+                                    }
                                 }
                                 break;
                         }
@@ -2144,7 +2166,7 @@ void PerimeterGenerator::process_arachne()
                             ordered_extrusions[arr_j] = inner_outer_extrusions[arr_j-position];
                     } else
                         break;
-                    // go to the next perimeter to continue scanning for external walls in the same island
+                    // go to the next perimeter from the current position to continue scanning for external walls in the same island
                     position = arr_i + 1;
                 }
             }
