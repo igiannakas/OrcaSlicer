@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Orca Slicer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-09-30 10:27+0800\n"
+"POT-Creation-Date: 2023-10-15 11:57+0800\n"
 "PO-Revision-Date: \n"
 "Last-Translator: Carlos Fco. Caruncho Serrano <puzzlero@gmail.com>\n"
 "Language-Team: \n"
@@ -163,6 +163,12 @@ msgstr "Triángulo"
 
 msgid "Height Range"
 msgstr "Rango de altura"
+
+msgid "Vertical"
+msgstr ""
+
+msgid "Horizontal"
+msgstr ""
 
 msgid "Remove painted color"
 msgstr "Eliminar color pintado"
@@ -4426,6 +4432,24 @@ msgstr "Ajustes del filamento"
 msgid "Printer settings"
 msgstr "Ajustes de la impresora"
 
+msgid "Remove current plate (if not last one)"
+msgstr ""
+
+msgid "Auto orient objects on current plate"
+msgstr ""
+
+msgid "Arrange objects on current plate"
+msgstr ""
+
+msgid "Unlock current plate"
+msgstr ""
+
+msgid "Lock current plate"
+msgstr ""
+
+msgid "Customize current plate"
+msgstr ""
+
 msgid "Untitled"
 msgstr "Sin título"
 
@@ -5031,6 +5055,12 @@ msgid ""
 msgstr ""
 "Hacer zoom hacia la posición del puntero de ratón en la vista 3D, en vez del "
 "centro de la ventana 2D."
+
+msgid "Use free camera"
+msgstr ""
+
+msgid "If enabled, use free camera. If not enabled, use constrained camera."
+msgstr ""
 
 msgid "Show \"Tip of the day\" notification after start"
 msgstr "Mostrar la notificación \"Consejo del Día\" después de empezar"
@@ -7359,6 +7389,19 @@ msgstr ""
 "Contraer la primera capa en la bandeja de impresión para compensar el efecto "
 "de la pata de elefante"
 
+msgid "Elephant foot compensation layers"
+msgstr ""
+
+msgid ""
+"The number of layers on which the elephant foot compensation will be active. "
+"The first layer will be shrunk by the elephant foot compensation value, then "
+"the next layers will be linearly shrunk less, up to the layer indicated by "
+"this value."
+msgstr ""
+
+msgid "layers"
+msgstr "capas"
+
 msgid ""
 "Slicing height for each layer. Smaller layer height means more accurate and "
 "more printing time"
@@ -7945,9 +7988,6 @@ msgstr ""
 "Desactivar todos los ventiladores de refrigeración en las primeras capas. El "
 "ventilador de la primera capa debe estar apagado para conseguir una mejor "
 "adhesión de la bandeja de impresión"
-
-msgid "layers"
-msgstr "capas"
 
 msgid "Don't support bridges"
 msgstr "No soportar puentes"
@@ -8818,12 +8858,8 @@ msgstr "Filtrar pequeños huecos"
 msgid "Layers and Perimeters"
 msgstr "Capas y Perímetros"
 
-msgid ""
-"Filter out gaps smaller than the threshold specified. This setting won't "
-"affect top/bottom layers"
+msgid "Filter out gaps smaller than the threshold specified"
 msgstr ""
-"Filtrar espacios menores que el umbral especificado. Esta configuración no "
-"afectará en las capas superior/inferior"
 
 msgid ""
 "Speed of gap infill. Gap usually has irregular line width and should be "
@@ -9107,6 +9143,9 @@ msgstr "Todas la capas sólidas"
 msgid "Ironing Pattern"
 msgstr "Patrón de Alisado"
 
+msgid "The pattern that will be used when ironing"
+msgstr ""
+
 msgid "Ironing flow"
 msgstr "Flujo de alisado"
 
@@ -9129,6 +9168,14 @@ msgstr "Velocidad de alisado"
 
 msgid "Print speed of ironing lines"
 msgstr "Velocidad de impresión de las líneas de alisado"
+
+msgid "Ironing angle"
+msgstr ""
+
+msgid ""
+"The angle ironing is done at. A negative number disables this function and "
+"uses the default method."
+msgstr ""
 
 msgid "This gcode part is inserted at every layer change after lift z"
 msgstr ""
@@ -10627,6 +10674,34 @@ msgstr ""
 "negativo hace que el contorno sea más pequeño. Esta función se utiliza para "
 "ajustar el tamaño ligeramente cuando el objeto tiene problemas de ensamblaje"
 
+msgid "Convert holes to polyholes"
+msgstr ""
+
+msgid ""
+"Search for almost-circular holes that span more than one layer and convert "
+"the geometry to polyholes. Use the nozzle size and the (biggest) diameter to "
+"compute the polyhole.\n"
+"See http://hydraraptor.blogspot.com/2011/02/polyholes.html"
+msgstr ""
+
+msgid "Polyhole detection margin"
+msgstr ""
+
+#, c-format, boost-format
+msgid ""
+"Maximum defection of a point to the estimated radius of the circle.\n"
+"As cylinders are often exported as triangles of varying size, points may not "
+"be on the circle circumference. This setting allows you some leway to "
+"broaden the detection.\n"
+"In mm or in % of the radius."
+msgstr ""
+
+msgid "Polyhole twist"
+msgstr ""
+
+msgid "Rotate the polyhole every layer."
+msgstr ""
+
 msgid "G-code thumbnails"
 msgstr "Miniaturas de G-Code"
 
@@ -11047,13 +11122,6 @@ msgstr ""
 
 msgid "Optimizing toolpath"
 msgstr "Optimización de la trayectoria de la herramienta"
-
-msgid "Empty layers around bottom are replaced by nearest normal layers."
-msgstr ""
-"Las capas vacías del fondo se sustituyen por las capas normales más cercanas."
-
-msgid "The model has too many empty layers."
-msgstr "El modelo tiene demasiadas capas vacías."
 
 msgid "Slicing mesh"
 msgstr "Malla de corte"
@@ -12261,6 +12329,21 @@ msgstr ""
 "Mejorar la resistencia\n"
 "¿Sabías que puedes utilizar más bucles de perímetro y mayor densidad de "
 "relleno de baja densidad para mejorar la resistencia del modelo?"
+
+#~ msgid ""
+#~ "Filter out gaps smaller than the threshold specified. This setting won't "
+#~ "affect top/bottom layers"
+#~ msgstr ""
+#~ "Filtrar espacios menores que el umbral especificado. Esta configuración "
+#~ "no afectará en las capas superior/inferior"
+
+#~ msgid "Empty layers around bottom are replaced by nearest normal layers."
+#~ msgstr ""
+#~ "Las capas vacías del fondo se sustituyen por las capas normales más "
+#~ "cercanas."
+
+#~ msgid "The model has too many empty layers."
+#~ msgstr "El modelo tiene demasiadas capas vacías."
 
 #~ msgid "Cali"
 #~ msgstr "Cali"

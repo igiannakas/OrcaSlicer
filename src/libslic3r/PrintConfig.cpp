@@ -2038,7 +2038,7 @@ def = this->add("filament_loading_speed", coFloats);
     def = this->add("filter_out_gap_fill", coFloat);
     def->label = L("Filter out tiny gaps");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Filter out gaps smaller than the threshold specified. This setting won't affect top/bottom layers");
+    def->tooltip = L("Filter out gaps smaller than the threshold specified");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
     
@@ -2335,6 +2335,7 @@ def = this->add("filament_loading_speed", coFloats);
 
     def                = this->add("ironing_pattern", coEnum);
     def->label         = L("Ironing Pattern");
+    def->tooltip       = L("The pattern that will be used when ironing");
     def->category      = L("Quality");
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values.push_back("concentric");
@@ -2374,6 +2375,16 @@ def = this->add("filament_loading_speed", coFloats);
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(20));
+
+    def           = this->add("ironing_angle", coFloat);
+    def->label    = L("Ironing angle");
+    def->category = L("Quality");
+    def->tooltip  = L("The angle ironing is done at. A negative number disables this function and uses the default method.");
+    def->sidetext = L("°");
+    def->min      = -1;
+    def->max      = 359;
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(-1));
 
     def = this->add("layer_change_gcode", coString);
     def->label = L("Layer change G-code");
@@ -4141,6 +4152,34 @@ def = this->add("filament_loading_speed", coFloats);
     def->sidetext = L("mm");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("hole_to_polyhole", coBool);
+    def->label = L("Convert holes to polyholes");
+    def->category = L("Quality");
+    def->tooltip = L("Search for almost-circular holes that span more than one layer and convert the geometry to polyholes."
+                     " Use the nozzle size and the (biggest) diameter to compute the polyhole."
+                     "\nSee http://hydraraptor.blogspot.com/2011/02/polyholes.html");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("hole_to_polyhole_threshold", coFloatOrPercent);
+    def->label = L("Polyhole detection margin");
+    def->category = L("Quality");
+    def->tooltip = L("Maximum defection of a point to the estimated radius of the circle."
+                     "\nAs cylinders are often exported as triangles of varying size, points may not be on the circle circumference."
+                     " This setting allows you some leway to broaden the detection."
+                     "\nIn mm or in % of the radius.");
+    def->sidetext = L("mm or %");
+    def->max_literal = 10;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0.01, false));
+
+    def = this->add("hole_to_polyhole_twisted", coBool);
+    def->label = L("Polyhole twist");
+    def->category = L("Quality");
+    def->tooltip = L("Rotate the polyhole every layer.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("thumbnails", coPoints);
     def->label = L("G-code thumbnails");

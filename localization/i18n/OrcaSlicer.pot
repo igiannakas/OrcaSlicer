@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-09-30 10:27+0800\n"
+"POT-Creation-Date: 2023-10-15 11:57+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -164,6 +164,12 @@ msgid "Triangle"
 msgstr ""
 
 msgid "Height Range"
+msgstr ""
+
+msgid "Vertical"
+msgstr ""
+
+msgid "Horizontal"
 msgstr ""
 
 msgid "Remove painted color"
@@ -4142,6 +4148,24 @@ msgstr ""
 msgid "Printer settings"
 msgstr ""
 
+msgid "Remove current plate (if not last one)"
+msgstr ""
+
+msgid "Auto orient objects on current plate"
+msgstr ""
+
+msgid "Arrange objects on current plate"
+msgstr ""
+
+msgid "Unlock current plate"
+msgstr ""
+
+msgid "Lock current plate"
+msgstr ""
+
+msgid "Customize current plate"
+msgstr ""
+
 msgid "Untitled"
 msgstr ""
 
@@ -4676,6 +4700,12 @@ msgstr ""
 msgid ""
 "Zoom in towards the mouse pointer's position in the 3D view, rather than the "
 "2D window center."
+msgstr ""
+
+msgid "Use free camera"
+msgstr ""
+
+msgid "If enabled, use free camera. If not enabled, use constrained camera."
 msgstr ""
 
 msgid "Show \"Tip of the day\" notification after start"
@@ -6769,6 +6799,19 @@ msgid ""
 "effect"
 msgstr ""
 
+msgid "Elephant foot compensation layers"
+msgstr ""
+
+msgid ""
+"The number of layers on which the elephant foot compensation will be active. "
+"The first layer will be shrunk by the elephant foot compensation value, then "
+"the next layers will be linearly shrunk less, up to the layer indicated by "
+"this value."
+msgstr ""
+
+msgid "layers"
+msgstr ""
+
 msgid ""
 "Slicing height for each layer. Smaller layer height means more accurate and "
 "more printing time"
@@ -7232,9 +7275,6 @@ msgstr ""
 msgid ""
 "Close all cooling fan for the first certain layers. Cooling fan of the first "
 "layer used to be closed to get better build plate adhesion"
-msgstr ""
-
-msgid "layers"
 msgstr ""
 
 msgid "Don't support bridges"
@@ -7937,9 +7977,7 @@ msgstr ""
 msgid "Layers and Perimeters"
 msgstr ""
 
-msgid ""
-"Filter out gaps smaller than the threshold specified. This setting won't "
-"affect top/bottom layers"
+msgid "Filter out gaps smaller than the threshold specified"
 msgstr ""
 
 msgid ""
@@ -8171,6 +8209,9 @@ msgstr ""
 msgid "Ironing Pattern"
 msgstr ""
 
+msgid "The pattern that will be used when ironing"
+msgstr ""
+
 msgid "Ironing flow"
 msgstr ""
 
@@ -8189,6 +8230,14 @@ msgid "Ironing speed"
 msgstr ""
 
 msgid "Print speed of ironing lines"
+msgstr ""
+
+msgid "Ironing angle"
+msgstr ""
+
+msgid ""
+"The angle ironing is done at. A negative number disables this function and "
+"uses the default method."
 msgstr ""
 
 msgid "This gcode part is inserted at every layer change after lift z"
@@ -9429,6 +9478,34 @@ msgid ""
 "assembling issue"
 msgstr ""
 
+msgid "Convert holes to polyholes"
+msgstr ""
+
+msgid ""
+"Search for almost-circular holes that span more than one layer and convert "
+"the geometry to polyholes. Use the nozzle size and the (biggest) diameter to "
+"compute the polyhole.\n"
+"See http://hydraraptor.blogspot.com/2011/02/polyholes.html"
+msgstr ""
+
+msgid "Polyhole detection margin"
+msgstr ""
+
+#, possible-c-format, possible-boost-format
+msgid ""
+"Maximum defection of a point to the estimated radius of the circle.\n"
+"As cylinders are often exported as triangles of varying size, points may not "
+"be on the circle circumference. This setting allows you some leway to "
+"broaden the detection.\n"
+"In mm or in % of the radius."
+msgstr ""
+
+msgid "Polyhole twist"
+msgstr ""
+
+msgid "Rotate the polyhole every layer."
+msgstr ""
+
 msgid "G-code thumbnails"
 msgstr ""
 
@@ -9788,12 +9865,6 @@ msgid ""
 msgstr ""
 
 msgid "Optimizing toolpath"
-msgstr ""
-
-msgid "Empty layers around bottom are replaced by nearest normal layers."
-msgstr ""
-
-msgid "The model has too many empty layers."
 msgstr ""
 
 msgid "Slicing mesh"

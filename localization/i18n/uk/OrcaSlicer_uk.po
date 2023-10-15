@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-09-30 10:27+0800\n"
+"POT-Creation-Date: 2023-10-15 11:57+0800\n"
 "PO-Revision-Date: 2023-08-10 20:25-0400\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -168,6 +168,12 @@ msgstr "Трикутник"
 
 msgid "Height Range"
 msgstr "Переключити каркас"
+
+msgid "Vertical"
+msgstr ""
+
+msgid "Horizontal"
+msgstr ""
 
 msgid "Remove painted color"
 msgstr "Видалити зафарбований колір"
@@ -4390,6 +4396,24 @@ msgstr "Настінні філаменти"
 msgid "Printer settings"
 msgstr "Налаштування принтера"
 
+msgid "Remove current plate (if not last one)"
+msgstr ""
+
+msgid "Auto orient objects on current plate"
+msgstr ""
+
+msgid "Arrange objects on current plate"
+msgstr ""
+
+msgid "Unlock current plate"
+msgstr ""
+
+msgid "Lock current plate"
+msgstr ""
+
+msgid "Customize current plate"
+msgstr ""
+
 msgid "Untitled"
 msgstr "Без імені"
 
@@ -4979,6 +5003,12 @@ msgid ""
 "2D window center."
 msgstr ""
 "Наблизьтеся до положення покажчика миші у 3D-виді, а не до центру 2D вікна."
+
+msgid "Use free camera"
+msgstr ""
+
+msgid "If enabled, use free camera. If not enabled, use constrained camera."
+msgstr ""
 
 msgid "Show \"Tip of the day\" notification after start"
 msgstr "Показувати повідомлення \"Рада дня\" після запуску"
@@ -7229,6 +7259,19 @@ msgid ""
 "effect"
 msgstr "Усадка початкового шару на столі для компенсації ефекту слонової ноги"
 
+msgid "Elephant foot compensation layers"
+msgstr ""
+
+msgid ""
+"The number of layers on which the elephant foot compensation will be active. "
+"The first layer will be shrunk by the elephant foot compensation value, then "
+"the next layers will be linearly shrunk less, up to the layer indicated by "
+"this value."
+msgstr ""
+
+msgid "layers"
+msgstr "шари"
+
 msgid ""
 "Slicing height for each layer. Smaller layer height means more accurate and "
 "more printing time"
@@ -7784,9 +7827,6 @@ msgstr ""
 "Закрийте всі вентилятори, що охолоджують, для перших певних шарів. "
 "Вентилятор охолодження першого шару був закритий, щоб покращити "
 "адгезіюРобочої пластини"
-
-msgid "layers"
-msgstr "шари"
 
 msgid "Don't support bridges"
 msgstr "Не підтримувати мости"
@@ -8611,9 +8651,7 @@ msgstr "Відфільтрувати крихітні зазори"
 msgid "Layers and Perimeters"
 msgstr "Шари та периметри"
 
-msgid ""
-"Filter out gaps smaller than the threshold specified. This setting won't "
-"affect top/bottom layers"
+msgid "Filter out gaps smaller than the threshold specified"
 msgstr ""
 
 msgid ""
@@ -8891,6 +8929,9 @@ msgstr "Весь суцільний шар"
 msgid "Ironing Pattern"
 msgstr ""
 
+msgid "The pattern that will be used when ironing"
+msgstr ""
+
 msgid "Ironing flow"
 msgstr "Плавний потік"
 
@@ -8913,6 +8954,14 @@ msgstr "Швидкість розглажування"
 
 msgid "Print speed of ironing lines"
 msgstr "Швидкість друку прасувальних ліній"
+
+msgid "Ironing angle"
+msgstr ""
+
+msgid ""
+"The angle ironing is done at. A negative number disables this function and "
+"uses the default method."
+msgstr ""
 
 msgid "This gcode part is inserted at every layer change after lift z"
 msgstr "Ця частина gcode вставляється при кожній зміні шару після підйому z"
@@ -10307,6 +10356,34 @@ msgstr ""
 "функція використовується для невеликої Корегування розміру, коли об'єкт має "
 "проблему складання"
 
+msgid "Convert holes to polyholes"
+msgstr ""
+
+msgid ""
+"Search for almost-circular holes that span more than one layer and convert "
+"the geometry to polyholes. Use the nozzle size and the (biggest) diameter to "
+"compute the polyhole.\n"
+"See http://hydraraptor.blogspot.com/2011/02/polyholes.html"
+msgstr ""
+
+msgid "Polyhole detection margin"
+msgstr ""
+
+#, c-format, boost-format
+msgid ""
+"Maximum defection of a point to the estimated radius of the circle.\n"
+"As cylinders are often exported as triangles of varying size, points may not "
+"be on the circle circumference. This setting allows you some leway to "
+"broaden the detection.\n"
+"In mm or in % of the radius."
+msgstr ""
+
+msgid "Polyhole twist"
+msgstr ""
+
+msgid "Rotate the polyhole every layer."
+msgstr ""
+
 msgid "G-code thumbnails"
 msgstr "Мініатюри G-code"
 
@@ -10706,12 +10783,6 @@ msgstr ""
 
 msgid "Optimizing toolpath"
 msgstr "Оптимізація траєкторії інструменту"
-
-msgid "Empty layers around bottom are replaced by nearest normal layers."
-msgstr "Порожні шари навколо дна замінюються найближчими нормальними шарами."
-
-msgid "The model has too many empty layers."
-msgstr "У моделі занадто багато порожніх шарів."
 
 msgid "Slicing mesh"
 msgstr "Нарізка сітки"
@@ -11796,6 +11867,13 @@ msgstr ""
 "Підвищення міцності\n"
 "Чи знаєте ви, що для підвищення міцності моделі можна використовувати "
 "більшепериметрів та вищу щільність заповнення?"
+
+#~ msgid "Empty layers around bottom are replaced by nearest normal layers."
+#~ msgstr ""
+#~ "Порожні шари навколо дна замінюються найближчими нормальними шарами."
+
+#~ msgid "The model has too many empty layers."
+#~ msgstr "У моделі занадто багато порожніх шарів."
 
 #~ msgid "Cali"
 #~ msgstr "Калі"

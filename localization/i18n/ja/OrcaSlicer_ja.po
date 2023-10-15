@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Orca Slicer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-09-30 10:27+0800\n"
+"POT-Creation-Date: 2023-10-15 11:57+0800\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -161,6 +161,12 @@ msgstr "三角形"
 
 msgid "Height Range"
 msgstr "高さ範囲"
+
+msgid "Vertical"
+msgstr ""
+
+msgid "Horizontal"
+msgstr ""
 
 msgid "Remove painted color"
 msgstr "塗った色を消去"
@@ -4251,6 +4257,24 @@ msgstr "フィラメント設定"
 msgid "Printer settings"
 msgstr "プリンター設定"
 
+msgid "Remove current plate (if not last one)"
+msgstr ""
+
+msgid "Auto orient objects on current plate"
+msgstr ""
+
+msgid "Arrange objects on current plate"
+msgstr ""
+
+msgid "Unlock current plate"
+msgstr ""
+
+msgid "Lock current plate"
+msgstr ""
+
+msgid "Customize current plate"
+msgstr ""
+
 msgid "Untitled"
 msgstr "名称未設定"
 
@@ -4829,6 +4853,12 @@ msgid ""
 msgstr ""
 "Zoom in towards the mouse pointer's position in the 3D view, rather than the "
 "2D window center."
+
+msgid "Use free camera"
+msgstr ""
+
+msgid "If enabled, use free camera. If not enabled, use constrained camera."
+msgstr ""
 
 msgid "Show \"Tip of the day\" notification after start"
 msgstr "起動後「毎日のヒント」を表示"
@@ -7013,6 +7043,19 @@ msgid ""
 "effect"
 msgstr "1層目を縮小して、コーナーのはみ出しを軽減します。"
 
+msgid "Elephant foot compensation layers"
+msgstr ""
+
+msgid ""
+"The number of layers on which the elephant foot compensation will be active. "
+"The first layer will be shrunk by the elephant foot compensation value, then "
+"the next layers will be linearly shrunk less, up to the layer indicated by "
+"this value."
+msgstr ""
+
+msgid "layers"
+msgstr "積層"
+
 msgid ""
 "Slicing height for each layer. Smaller layer height means more accurate and "
 "more printing time"
@@ -7523,9 +7566,6 @@ msgid ""
 "layer used to be closed to get better build plate adhesion"
 msgstr ""
 "1層目をプリント時に全てのファンをオフにします。ベッドとの接着性を高めます"
-
-msgid "layers"
-msgstr "積層"
 
 msgid "Don't support bridges"
 msgstr "ブリッジにサポートしない"
@@ -8261,9 +8301,7 @@ msgstr ""
 msgid "Layers and Perimeters"
 msgstr "積層と境界"
 
-msgid ""
-"Filter out gaps smaller than the threshold specified. This setting won't "
-"affect top/bottom layers"
+msgid "Filter out gaps smaller than the threshold specified"
 msgstr ""
 
 msgid ""
@@ -8505,6 +8543,9 @@ msgstr "全てのソリッド積層"
 msgid "Ironing Pattern"
 msgstr "Ironing Pattern"
 
+msgid "The pattern that will be used when ironing"
+msgstr ""
+
 msgid "Ironing flow"
 msgstr "アイロン時の流量比率"
 
@@ -8524,6 +8565,14 @@ msgstr "アイロン時の移動速度"
 
 msgid "Print speed of ironing lines"
 msgstr "アイロン時の造形速度です。"
+
+msgid "Ironing angle"
+msgstr ""
+
+msgid ""
+"The angle ironing is done at. A negative number disables this function and "
+"uses the default method."
+msgstr ""
 
 msgid "This gcode part is inserted at every layer change after lift z"
 msgstr "積層が変わる直後に実行するG-codeです。"
@@ -9839,6 +9888,34 @@ msgstr ""
 "オブジェクトの輪郭の大きさの調整値です。正数は大きくし、負数は小さくします。"
 "これがパーツを組み立てる為にはめあいの微調整です。"
 
+msgid "Convert holes to polyholes"
+msgstr ""
+
+msgid ""
+"Search for almost-circular holes that span more than one layer and convert "
+"the geometry to polyholes. Use the nozzle size and the (biggest) diameter to "
+"compute the polyhole.\n"
+"See http://hydraraptor.blogspot.com/2011/02/polyholes.html"
+msgstr ""
+
+msgid "Polyhole detection margin"
+msgstr ""
+
+#, c-format, boost-format
+msgid ""
+"Maximum defection of a point to the estimated radius of the circle.\n"
+"As cylinders are often exported as triangles of varying size, points may not "
+"be on the circle circumference. This setting allows you some leway to "
+"broaden the detection.\n"
+"In mm or in % of the radius."
+msgstr ""
+
+msgid "Polyhole twist"
+msgstr ""
+
+msgid "Rotate the polyhole every layer."
+msgstr ""
+
 msgid "G-code thumbnails"
 msgstr ""
 
@@ -10227,12 +10304,6 @@ msgstr ""
 
 msgid "Optimizing toolpath"
 msgstr "ツールパスを最適化"
-
-msgid "Empty layers around bottom are replaced by nearest normal layers."
-msgstr "底面との隙間があります、レイヤーを入れ替えました"
-
-msgid "The model has too many empty layers."
-msgstr "このモデルには空層があります。"
 
 msgid "Slicing mesh"
 msgstr "メッシュをスライス中"
@@ -11279,6 +11350,12 @@ msgid ""
 msgstr ""
 "強度の向上\n"
 "壁面層数やインフィルの充填密度を増やして造形強度を向上できます。"
+
+#~ msgid "Empty layers around bottom are replaced by nearest normal layers."
+#~ msgstr "底面との隙間があります、レイヤーを入れ替えました"
+
+#~ msgid "The model has too many empty layers."
+#~ msgstr "このモデルには空層があります。"
 
 #~ msgid "Cali"
 #~ msgstr "標定"
