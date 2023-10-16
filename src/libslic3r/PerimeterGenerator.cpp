@@ -406,7 +406,7 @@ static ClipperLib_Z::Paths clip_extrusion(const ClipperLib_Z::Path& subject, con
                 end = e2top;
             }
 
-            assert(start.z() > 0 && end.z() > 0);
+            //assert(start.z() > 0 && end.z() > 0);
 
             // Interpolate extrusion line width.
             double length_sqr = (end - start).cast<double>().squaredNorm();
@@ -2017,7 +2017,7 @@ void PerimeterGenerator::process_arachne()
             }
         }
 
-       // printf("New Layer: Layer ID %d\n",layer_id); //debug - new layer
+        printf("New Layer: Layer ID %d\n",layer_id); //debug - new layer
         if (this->config->wall_infill_order == WallInfillOrder::InnerOuterInnerInfill && layer_id > 0) { // only enable inner outer inner algorithm after first layer
             if (ordered_extrusions.size() > 2) { // 3 walls minimum needed to do inner outer inner ordering
                 int position = 0; // index to run the re-ordering for multiple external perimeters in a single island.
@@ -2067,9 +2067,9 @@ void PerimeterGenerator::process_arachne()
                     // run through the walls to get the index values that need re-ordering until the first one for each
                     // is found. Start at "position" index to enable the for loop to iterate for multiple external
                     // perimeters in a single island
-                    // printf("Reorder Loop. Position %d, extrusion list size: %d, Outer index %d, inner index %d, second inner index %d\n", position, reordered_extrusions.size(),outer,first_internal,second_internal);
+                     printf("Reorder Loop. Position %d, extrusion list size: %d, Outer index %d, inner index %d, second inner index %d\n", position, reordered_extrusions.size(),outer,first_internal,second_internal);
                     for (arr_i = position; arr_i < reordered_extrusions.size(); ++arr_i) {
-                        // printf("Perimeter: extrusion inset index %d, ordered extrusions array position %d\n",reordered_extrusions[arr_i].extrusion->inset_idx, arr_i);
+                         printf("Perimeter: extrusion inset index %d, ordered extrusions array position %d\n",reordered_extrusions[arr_i].extrusion->inset_idx, arr_i);
                         switch (reordered_extrusions[arr_i].extrusion->inset_idx) {
                             case 0: // external perimeter
                                 if (outer == -1)
@@ -2083,6 +2083,91 @@ void PerimeterGenerator::process_arachne()
                             case 2: // second internal wall
                                 if (second_internal == -1 && arr_i > first_internal && outer!=-1){
                                     second_internal = arr_i;
+                                    // start scanning remaining second internal perimeters in case there is any perimeter that
+                                    // has an end position closer to the first external perimeter starting position.
+                                    // If one is found, swap positions with the currently identified second internal perimeter
+                                    
+                                    Polyline *internal_path = new Polyline();
+                                    Polyline *external_path = new Polyline();
+                                    bool lines_touching = false;
+                                    
+                                    const auto& junctions_tmp_external = reordered_extrusions[outer].extrusion->junctions;
+                                    for (size_t i = 0; i < std::min(junctions_tmp_external.size(), size_t(4)); ++i) {
+                                        external_path->append(junctions_tmp_external[i].p);
+                                    }
+                                    
+                                    const auto& junctions_tmp_internal = reordered_extrusions[second_internal].extrusion->junctions;
+                                    for (size_t i = 0; i < std::min(junctions_tmp_internal.size(), size_t(4)); ++i) {
+                                        internal_path->append(junctions_tmp_internal[i].p);
+                                    }
+                                    AABBTreeLines::LinesDistancer<Line> lines_internal{internal_path->lines()};
+                                    AABBTreeLines::LinesDistancer<Line> lines_external{external_path->lines()};
+                                    
+                                    for (size_t pt_idx = 0; pt_idx < external_path->size(); pt_idx++){
+                                        auto cur_distance_sqr = lines_internal.distance_from_lines<false>(external_path->points[pt_idx]);
+                                        printf("Current distance: Layer: %d, distance %f\n", layer_id, cur_distance_sqr);
+                                    }
+                                    
+                                    int closer_perimeter = -1;
+                                    for(int closer_second_intenal = second_internal + 1;closer_second_intenal < reordered_extrusions.size(); ++closer_second_intenal){
+                                        
+                                        //Point candidate_second_internal_end_position = reordered_extrusions[closer_second_intenal].extrusion->junctions.back().p;
+                                        //double candidate_distance_sqr = (candidate_second_internal_end_position - ext_start_position).cast<double>().norm();
+                                        
+                                        Polyline *internal_path_new = new Polyline();
+                                        const auto& junctions_tmp_internal_new = reordered_extrusions[closer_second_intenal].extrusion->junctions;
+                                        for (size_t i = 0; i < std::min(junctions_tmp_internal_new.size(), size_t(4)); ++i) {
+                                            internal_path_new->append(junctions_tmp_internal_new[i].p);
+                                        }
+                                            
+                                        AABBTreeLines::LinesDistancer<Line> lines_internal_new{internal_path_new->lines()};
+                                        for (size_t pt_idx = 0; pt_idx < external_path->size(); pt_idx++){
+                                            auto cur_distance_sqr_new = lines_internal_new.distance_from_lines<false>(external_path->points[pt_idx]);
+                                            printf("Current distance: Layer: %d, distance %f, perimeter index %d\n", layer_id, cur_distance_sqr_new, closer_second_intenal);
+                                        }
+                                        
+                                        /*printf("Scanning for closer perimeters. LayerID: %d, perimeter:%d, distance %f \n", layer_id, closer_second_intenal, candidate_distance_sqr);
+                                        if(candidate_distance_sqr < cur_distance_sqr && reordered_extrusions[closer_second_intenal].extrusion->inset_idx == 2 ){
+                                            printf("REORDERED! LayerID: %d Original Distance: %f New Distance: %f, array position:  %d\n",layer_id, cur_distance_sqr,candidate_distance_sqr, closer_second_intenal);
+                                            cur_distance_sqr = candidate_distance_sqr;
+                                            closer_perimeter = closer_second_intenal;
+                                        }*/
+                                    }
+                                       // if (lines_external.distance_from_lines<false>(internal_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) //lines_touching = true;
+                                    
+                                    /*
+                                    
+                                    for (size_t pt_idx = 0; pt_idx < internal_path->size(); pt_idx++)
+                                        if (lines_external.distance_from_lines<false>(internal_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) lines_touching = true;
+                                    
+                                    for (size_t pt_idx = 0; pt_idx < external_path->size(); pt_idx++)
+                                        if (lines_internal.distance_from_lines<false>(external_path->points[pt_idx]) < (this->perimeter_flow.scaled_spacing() * 1.5f)) lines_touching = true;
+                                    
+                                    if(lines_touching) printf("LINES TOUCHING. LayerID %d, Perimeter index %d\n", layer_id, arr_j);
+                                    */
+                                    
+                                    
+                                    /*Point ext_start_position = reordered_extrusions[outer].extrusion->junctions[0].p;
+                                    Point current_second_internal_end_position = reordered_extrusions[second_internal].extrusion->junctions.back().p;
+                                    double cur_distance_sqr = (current_second_internal_end_position - ext_start_position).cast<double>().norm();
+                                    
+                                    printf("Current distance: Layer: %d, distance %f\n", layer_id, cur_distance_sqr);
+                                    int closer_perimeter = -1;
+                                    for(int closer_second_intenal = second_internal + 1;closer_second_intenal < reordered_extrusions.size(); ++closer_second_intenal){
+                                        
+                                        Point candidate_second_internal_end_position = reordered_extrusions[closer_second_intenal].extrusion->junctions.back().p;
+                                        double candidate_distance_sqr = (candidate_second_internal_end_position - ext_start_position).cast<double>().norm();
+                                        printf("Scanning for closer perimeters. LayerID: %d, perimeter:%d, distance %f \n", layer_id, closer_second_intenal, candidate_distance_sqr);
+                                        if(candidate_distance_sqr < cur_distance_sqr && reordered_extrusions[closer_second_intenal].extrusion->inset_idx == 2 ){
+                                            printf("REORDERED! LayerID: %d Original Distance: %f New Distance: %f, array position:  %d\n",layer_id, cur_distance_sqr,candidate_distance_sqr, closer_second_intenal);
+                                            cur_distance_sqr = candidate_distance_sqr;
+                                            closer_perimeter = closer_second_intenal;
+                                        }
+                                    }
+                                    if(closer_perimeter > -1){
+                                        printf("REORDERED! External Perimeter Index: %d LayerID: %d, Original Perimeter: %d, New Perimeter %d\n",outer, layer_id, second_internal, closer_perimeter);
+                                        std::swap(reordered_extrusions[closer_perimeter],reordered_extrusions[second_internal]);
+                                    }*/
                                 }
                                 break;
                         }
@@ -2093,22 +2178,22 @@ void PerimeterGenerator::process_arachne()
                         }
                     }
                     
-                    // printf("Layer ID %d, Outer index %d, inner index %d, second inner index %d, maximum internal perimeter %d \n",layer_id,outer,first_internal,second_internal, max_internal);
+                     printf("Layer ID %d, Outer index %d, inner index %d, second inner index %d, maximum internal perimeter %d \n",layer_id,outer,first_internal,second_internal, max_internal);
                     if (outer > -1 && first_internal > -1 && second_internal > -1) { // found perimeters to re-order?
                         std::vector<PerimeterGeneratorArachneExtrusion> inner_outer_extrusions; // temporary array to hold extrusions for reordering
                         inner_outer_extrusions.reserve(max_internal - position + 1); // reserve array containing the number of perimeters before a new island. Variables are array indexes hence need to add +1 to convert to position allocations
-                        // printf("Allocated array size %d, max_internal index %d, start position index %d \n",max_internal-position+1,max_internal,position);
+                         printf("Allocated array size %d, max_internal index %d, start position index %d \n",max_internal-position+1,max_internal,position);
                         
                         for (arr_j = max_internal; arr_j >=position; --arr_j){ // go inside out towards the external perimeter (perimeters in reverse order) and store all internal perimeters until the first one identified with inset index 2
                             if(arr_j >= second_internal){
-                                //printf("Inside out loop: Mapped perimeter index %d to array position %d\n", arr_j, max_internal-arr_j);
+                                printf("Inside out loop: Mapped perimeter index %d to array position %d\n", arr_j, max_internal-arr_j);
                                 inner_outer_extrusions[max_internal-arr_j] = reordered_extrusions[arr_j];
                                 current_perimeter++; 
                             }
                         }
                         
                         for (arr_j = position; arr_j < second_internal; ++arr_j){ // go outside in and map the remaining perimeters (external and first internal wall(s)) using the outside in wall order
-                            // printf("Outside in loop: Mapped perimeter index %d to array position %d\n", arr_j, current_perimeter+1);
+                             printf("Outside in loop: Mapped perimeter index %d to array position %d\n", arr_j, current_perimeter+1);
                             inner_outer_extrusions[++current_perimeter] = reordered_extrusions[arr_j];
                         }
                         
