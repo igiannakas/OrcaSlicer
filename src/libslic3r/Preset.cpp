@@ -803,8 +803,8 @@ static std::vector<std::string> s_Preset_filament_options {
     "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
     "filament_unloading_speed", "filament_unloading_speed_start", "filament_unload_time", "filament_toolchange_delay", "filament_cooling_moves",
     "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters",
-    "filament_multitool_ramming", "filament_multitool_ramming_volume", "filament_multitool_ramming_flow", 
-};
+    "filament_multitool_ramming", "filament_multitool_ramming_volume", "filament_multitool_ramming_flow", "activate_chamber_temp_control"
+    };
 
 static std::vector<std::string> s_Preset_machine_limits_options {
     "machine_max_acceleration_extruding", "machine_max_acceleration_retracting", "machine_max_acceleration_travel",
@@ -818,7 +818,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "printer_technology",
     "printable_area", "bed_exclude_area","bed_custom_texture", "bed_custom_model", "gcode_flavor",
     "fan_kickstart", "fan_speedup_time", "fan_speedup_overhangs",
-    "single_extruder_multi_material", "machine_start_gcode", "machine_end_gcode", "before_layer_change_gcode", "layer_change_gcode", "time_lapse_gcode", "change_filament_gcode",
+    "single_extruder_multi_material", "manual_filament_change", "machine_start_gcode", "machine_end_gcode", "before_layer_change_gcode", "layer_change_gcode", "time_lapse_gcode", "change_filament_gcode",
     "printer_model", "printer_variant", "printable_height", "extruder_clearance_radius", "extruder_clearance_height_to_lid", "extruder_clearance_height_to_rod",
     "default_print_profile", "inherits",
     "silent_mode",
