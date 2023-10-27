@@ -2726,8 +2726,8 @@ void TabFilament::build()
 
 
         optgroup = page->new_optgroup(L("Print chamber temperature"), L"param_chamber_temp");
-        optgroup->append_single_option_line("chamber_temperature", "chamber-temperature");
-        optgroup->append_single_option_line("activate_chamber_temp_control", "chamber-temperature");
+        optgroup->append_single_option_line("chamber_temperature", "Chamber-temperature");
+        optgroup->append_single_option_line("activate_chamber_temp_control", "Chamber-temperature");
 
         optgroup->append_separator();
 
@@ -2832,11 +2832,11 @@ void TabFilament::build()
         optgroup->append_single_option_line("support_material_interface_fan_speed");
 
         optgroup = page->new_optgroup(L("Auxiliary part cooling fan"), L"param_cooling_fan");
-        optgroup->append_single_option_line("additional_cooling_fan_speed", "auxiliary-fan");
+        optgroup->append_single_option_line("additional_cooling_fan_speed", "Auxiliary-fan");
 
         optgroup = page->new_optgroup(L("Exhaust fan"),L"param_cooling_fan");
 
-        optgroup->append_single_option_line("activate_air_filtration", "air-filtration");
+        optgroup->append_single_option_line("activate_air_filtration", "Air-filtration(Exhaust-fan)");
 
         line = {L("During print"), ""};
         line.append_option(optgroup->get_option("during_print_exhaust_fan_speed"));
@@ -3166,8 +3166,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line("nozzle_type");
         optgroup->append_single_option_line("nozzle_hrc");
         optgroup->append_single_option_line("auxiliary_fan", "auxiliary-fan");
-        optgroup->append_single_option_line("support_chamber_temp_control", "chamber-temperature");
-        optgroup->append_single_option_line("support_air_filtration", "air-filtration");
+        optgroup->append_single_option_line("support_chamber_temp_control", "Chamber-temperature");
+        optgroup->append_single_option_line("support_air_filtration", "Air-filtration(Exhaust-fan)");
 
     const int gcode_field_height = 15; // 150
     const int notes_field_height = 25; // 250
@@ -3434,7 +3434,7 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 {
     size_t		n_before_extruders = 2;			//	Count of pages before Extruder pages
     auto        flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
-    bool		is_marlin_flavor = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfKlipper);
+    bool		is_marlin_flavor = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfKlipper || flavor == gcfRepRapFirmware);
 
     /* ! Freeze/Thaw in this function is needed to avoid call OnPaint() for erased pages
      * and be cause of application crash, when try to change Preset in moment,
@@ -3461,8 +3461,8 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
             m_pages.insert(m_pages.begin() + n_before_extruders, page);
     }
 
-    if (is_marlin_flavor)
-        n_before_extruders++;
+if (is_marlin_flavor)
+    n_before_extruders++;
     size_t		n_after_single_extruder_MM = 2; //	Count of pages after single_extruder_multi_material page
 
     if (from_initial_build) {
@@ -3829,12 +3829,11 @@ void TabPrinter::toggle_options()
 
     if (m_active_page->title() == L("Motion ability")) {
         auto gcf = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
-        assert(gcf == gcfMarlinLegacy || gcf == gcfMarlinFirmware || gcf == gcfKlipper);
         bool silent_mode = m_config->opt_bool("silent_mode");
         int  max_field   = silent_mode ? 2 : 1;
         for (int i = 0; i < max_field; ++i)
-            toggle_option("machine_max_acceleration_travel", gcf == gcfMarlinFirmware, i);
-        toggle_line("machine_max_acceleration_travel", gcf == gcfMarlinFirmware);
+            toggle_option("machine_max_acceleration_travel", gcf != gcfMarlinLegacy && gcf != gcfKlipper, i);
+        toggle_line("machine_max_acceleration_travel", gcf != gcfMarlinLegacy && gcf != gcfKlipper);
     }
 }
 
