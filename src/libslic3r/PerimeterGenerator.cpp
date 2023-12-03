@@ -1943,10 +1943,11 @@ void PerimeterGenerator::process_arachne()
         if (is_bottom_layer && this->config->only_one_wall_first_layer)
             loop_number = 0;
 
-        // BBS: set the topmost layer to be one wall
+        // Orca: set the topmost layer to be one wall according to the config
         const bool is_topmost_layer = (this->upper_slices == nullptr) ? true : false;
         if (is_topmost_layer && loop_number > 0 && config->only_one_wall_top)
             loop_number = 0;
+        // Orca: properly adjust offset for the outer wall if precise_outer_wall is enabled.
 
         ExPolygons last = offset_ex(surface.expolygon.simplify_p(surface_simplify_resolution),
                       config->precise_outer_wall ? -float(ext_perimeter_width - ext_perimeter_spacing )
@@ -1977,7 +1978,8 @@ void PerimeterGenerator::process_arachne()
                 // No top surfaces, no special handling needed
             } else {
                 // Adjust arachne input params to prevent removal of larger short walls, which could lead to gaps
-                input_params.is_top_or_bottom_layer = true;
+                Arachne::WallToolPathsParams input_params_tmp = input_params;
+                input_params_tmp.is_top_or_bottom_layer = true;
                 
                 // Use single-wall on top-surfaces if configured
                 if (loop_number > 0 && config->only_one_wall_top) {
@@ -1988,7 +1990,7 @@ void PerimeterGenerator::process_arachne()
                     // First we slice the outer shell
                     Polygons last_p = to_polygons(last);
                     Arachne::WallToolPaths wallToolPaths(last_p, bead_width_0, perimeter_spacing, coord_t(1),
-                                                        wall_0_inset, layer_height, input_params);
+                                                        wall_0_inset, layer_height, input_params_tmp);
                     out_shell = wallToolPaths.getToolPaths();
                     // Make sure infill not overlap with wall
                     top_fills = intersection_ex(top_fills, wallToolPaths.getInnerContour());
