@@ -86,7 +86,6 @@ jobs:
         run: |
           ./build_release_macos.sh -s -n -a ${{inputs.arch}}
 
-
       - name: Create DMG without notary
         if: inputs.os == 'macos-12'
         working-directory: ${{ github.workspace }}
