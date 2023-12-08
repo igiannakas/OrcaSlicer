@@ -122,11 +122,6 @@ class Sidebar : public wxPanel
 {
     ConfigOptionMode    m_mode;
 public:
-    enum DockingState
-    {
-        None, Left, Right
-    };
-
     Sidebar(Plater *parent);
     Sidebar(Sidebar &&) = delete;
     Sidebar(const Sidebar &) = delete;
@@ -318,13 +313,8 @@ public:
     bool is_view3D_overhang_shown() const;
     void show_view3D_overhang(bool show);
 
-    bool is_sidebar_enabled() const;
-    void enable_sidebar(bool enabled);
     bool is_sidebar_collapsed() const;
-    void collapse_sidebar(bool collapse);
-    Sidebar::DockingState get_sidebar_docking_state() const;
-
-    void reset_window_layout();
+    void collapse_sidebar(bool show);
 
     // Called after the Preferences dialog is closed and the program settings are saved.
     // Update the UI based on the current preferences.
@@ -551,6 +541,7 @@ public:
 #endif
 
     bool init_collapse_toolbar();
+    void enable_collapse_toolbar(bool enable);
 
     const Camera& get_camera() const;
     Camera& get_camera();

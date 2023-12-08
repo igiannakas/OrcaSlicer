@@ -4802,8 +4802,7 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 
                         if (total_count == 0) {
                             CallAfter([this] {
-                                if (!m_is_closing)
-                                    plater()->get_notification_manager()->close_notification_of_type(NotificationType::BBLUserPresetExceedLimit);
+                                plater()->get_notification_manager()->close_notification_of_type(NotificationType::BBLUserPresetExceedLimit);
                             });
                         }
 

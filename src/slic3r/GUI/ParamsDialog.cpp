@@ -65,7 +65,7 @@ ParamsDialog::ParamsDialog(wxWindow * parent)
     //wxGetApp().UpdateDlgDarkUI(this);
 }
 
-void ParamsDialog::Popup()
+void ParamsDialog::Popup(bool just_edit)
 {
     wxGetApp().UpdateDlgDarkUI(this);
 #ifdef __WIN32__
@@ -73,8 +73,6 @@ void ParamsDialog::Popup()
 #endif
     Center();
     if (m_panel && m_panel->get_current_tab()) {
-        bool just_edit = false;
-        if (!m_editing_filament_id.empty()) just_edit = true;
         dynamic_cast<Tab *>(m_panel->get_current_tab())->set_just_edit(just_edit);
     }
     Show();
