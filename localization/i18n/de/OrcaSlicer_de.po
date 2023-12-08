@@ -8215,7 +8215,7 @@ msgstr ""
 "Verwenden Sie nur eine Wand auf der Oberfläche, um mehr Platz für das obere "
 "Füllungsmuster zu schaffen"
 
-msgid "One wall threshold"
+msgid "Top-surface threshold"
 msgstr "Schwellenwert für eine Wand"
 
 #, fuzzy, c-format, boost-format
