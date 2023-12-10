@@ -7213,6 +7213,7 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     m_assemble_view_toolbar.set_icons_size(size);
     m_separator_toolbar.set_icons_size(size);
     collapse_toolbar.set_icons_size(size / 2.0);
+    m_gizmos.set_overlay_icon_size(size);
 #endif // ENABLE_RETINA_GL
 
     // Update collapse toolbar
@@ -7269,31 +7270,6 @@ void GLCanvas3D::_render_overlays()
     _render_assemble_control();
     _render_assemble_info();
 
-    // main toolbar and undoredo toolbar need to be both updated before rendering because both their sizes are needed
-    // to correctly place them
-#if ENABLE_RETINA_GL
-    const float scale = m_retina_helper->get_scale_factor() * wxGetApp().toolbar_icon_scale(/*true*/);
-    //BBS: GUI refactor: GLToolbar
-    m_main_toolbar.set_scale(scale);
-    m_assemble_view_toolbar.set_scale(scale);
-    m_separator_toolbar.set_scale(scale);
-    wxGetApp().plater()->get_collapse_toolbar().set_scale(scale / 2.0);
-    m_gizmos.set_overlay_scale(scale);
-#else
-    // BBS adjust display scale
-    const float size = int(GLToolbar::Default_Icons_Size * wxGetApp().toolbar_icon_scale(/*true*/));
-    const float gizmo_size = int(GLGizmosManager::Default_Icons_Size * wxGetApp().toolbar_icon_scale());
-    //const float size = int(GLToolbar::Default_Icons_Size);
-    //const float gizmo_size = int(GLGizmosManager::Default_Icons_Size);
-
-    //BBS: GUI refactor: GLToolbar
-    m_main_toolbar.set_icons_size(gizmo_size);
-    m_assemble_view_toolbar.set_icons_size(gizmo_size);
-    m_separator_toolbar.set_icons_size(gizmo_size);
-    wxGetApp().plater()->get_collapse_toolbar().set_icons_size(size / 2.0);
-    m_gizmos.set_overlay_icon_size(gizmo_size);
-#endif // ENABLE_RETINA_GL
-    
     _render_separator_toolbar_right();
     _render_separator_toolbar_left();
     _render_main_toolbar();
