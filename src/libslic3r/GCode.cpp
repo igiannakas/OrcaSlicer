@@ -353,12 +353,12 @@ static std::vector<Vec2d> get_path_of_change_filament(const Print& print)
                 double maximum_retraction_amount = length * (wipe_path.length() / wipe_dist ); // this is the maximum we can retract while wiping. It is the proportion of the available wipe distance against the desired wipe distance over the desired retraction length.
                 retract_before_wipe_length += length - maximum_retraction_amount; // Increment the retraction before wipe accumulating variable with the excess retraction amount
                 // Debug GCode Output - to remove before release
-                gcode +=";HERE: \n;Desired retraction amount: "+std::to_string(length) +
+                /*gcode +=";HERE: \n;Desired retraction amount: "+std::to_string(length) +
                         "\n;Maximum retraction amount: "+std::to_string(maximum_retraction_amount)+
                         "\n;Retract before wipe amount: "+std::to_string(retract_before_wipe_length)+
                         "\n;Available wipe path distance: "+std::to_string(wipe_path.length())+
                         "\n;Desired wipe path distance: "+std::to_string(wipe_dist)+
-                        "\n";
+                        "\n";*/
                 length  = maximum_retraction_amount; // set the retraction length while wiping to the maximum we can retract while wiping.
                 length = length < EPSILON ? EPSILON : length;
             }
