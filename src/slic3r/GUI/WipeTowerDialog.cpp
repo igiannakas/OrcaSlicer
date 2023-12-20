@@ -551,7 +551,7 @@ WipingPanel::WipingPanel(wxWindow* parent, const std::vector<float>& matrix, con
                 for (unsigned int j = 0; j < m_number_of_extruders; ++j) {
                     if (i == j)
                         continue; // if it is from/to the same extruder, don't change the value and continue
-                    edit_boxes[i][j]->SetValue(to_string(int(m_matrix[m_number_of_extruders * j + i] * multiplier)));
+                    edit_boxes[i][j]->SetValue(to_string(int(m_matrix[m_number_of_extruders * j + i] * multiplier - 37.5f)));
                 }
             }
 
@@ -688,7 +688,7 @@ void WipingPanel::calc_flushing_volumes()
                 }
             }
             m_matrix[m_number_of_extruders * from_idx + to_idx] = flushing_volume;
-            flushing_volume = int(flushing_volume * get_flush_multiplier());
+            flushing_volume = int(flushing_volume * get_flush_multiplier()-37.5f);
             edit_boxes[to_idx][from_idx]->SetValue(std::to_string(flushing_volume));
         }
     }
