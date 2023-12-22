@@ -3,7 +3,6 @@ name: Build all
 on:
   push:
     branches:
-     - main
      - release/*
     paths:
      - 'deps/**'
