@@ -1126,6 +1126,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "wall_transition_angle"
             || opt_key == "wall_distribution_count"
             || opt_key == "min_feature_size"
+            || opt_key == "min_length_factor"
             || opt_key == "min_bead_width") {
             steps.emplace_back(posSlice);
         } else if (
@@ -3227,11 +3228,8 @@ void PrintObject::discover_horizontal_shells()
                         // and it's not wanted in a hollow print even if it would make sense when
                         // obeying the solid shell count option strictly (DWIM!)
                         // Ioannis Giannakas: Also use the same strategy if the user has selected to reduce
-                        // the amount of solid infill on walls. However reduce the allowable perimeter width
-                        // that has no internal support to 30%. This is an arbitrary value to make this option somewhat safe
-                        // by ensuring that top surfaces especially slanted ones dont go **completely** unsupported
-                        // especially when using single perimeter top layers.
-                        float margin = region_config.reduce_wall_solid_infill? margin = float(neighbor_layerm->flow(frExternalPerimeter).scaled_width())*0.3f : float(neighbor_layerm->flow(frExternalPerimeter).scaled_width());
+                        // the amount of solid infill on walls.
+                        float margin = float(neighbor_layerm->flow(frExternalPerimeter).scaled_width());
                         Polygons too_narrow = diff(
                             new_internal_solid,
                             opening(new_internal_solid, margin, margin + ClipperSafetyOffset, jtMiter, 5));
