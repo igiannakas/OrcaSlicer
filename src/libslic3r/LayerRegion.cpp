@@ -391,22 +391,26 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
     // Width of the perimeters.
     float shell_width = 0;
     float expansion_min = 0;
+    float perimeter_width = 0;
     if (int num_perimeters = this->region().config().wall_loops; num_perimeters > 0) {
         Flow external_perimeter_flow = this->flow(frExternalPerimeter);
         Flow perimeter_flow          = this->flow(frPerimeter);
         shell_width  = 0.5f * external_perimeter_flow.scaled_width() + external_perimeter_flow.scaled_spacing();
+        perimeter_width = shell_width;
         shell_width += perimeter_flow.scaled_spacing() * (num_perimeters - 1);
         expansion_min = perimeter_flow.scaled_spacing();
     } else {
         // TODO: Maybe there is better solution when printing with zero perimeters, but this works reasonably well, given the situation
         shell_width   = float(SCALED_EPSILON);
-        expansion_min = float(SCALED_EPSILON);;
+        expansion_min = float(SCALED_EPSILON);
+        perimeter_width = shell_width;
     }
 
     // Scaled expansions of the respective external surfaces.
     float                           expansion_top           = shell_width * sqrt(2.);
     float                           expansion_bottom        = expansion_top;
-    float                           expansion_bottom_bridge = expansion_top;
+    //float                           expansion_bottom_bridge = perimeter_width;
+    float                           expansion_bottom_bridge = expansion_top * 6;
     // Expand by waves of expansion_step size (expansion_step is scaled), but with no more steps than max_nr_expansion_steps.
     static constexpr const float    expansion_step          = scaled<float>(0.1);
     // Don't take more than max_nr_steps for small expansion_step.

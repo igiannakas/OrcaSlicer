@@ -462,6 +462,8 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                         else
                             params.pattern = ipRectilinear;
                     }
+                    //if (is_bridge && surface.is_external())
+                    //    params.pattern = region_config.bottom_surface_pattern.value;
 		        } else if (params.density <= 0)
 		            continue;
 
