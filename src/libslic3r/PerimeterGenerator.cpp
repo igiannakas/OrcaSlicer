@@ -1941,6 +1941,7 @@ void PerimeterGenerator::process_arachne()
         int loop_number = this->config->wall_loops + surface.extra_perimeters - 1; // 0-indexed loops
         if (this->config->alternate_extra_wall && this->layer_id % 2 == 1 && !m_spiral_vase) // add alternating extra wall
             loop_number++;
+        
         // Set the bottommost layer to be one wall
         const bool is_bottom_layer = (this->layer_id == 0) ? true : false;
         if (is_bottom_layer && this->config->only_one_wall_first_layer)
@@ -1980,12 +1981,12 @@ void PerimeterGenerator::process_arachne()
             if (top_fills_tmp.empty()) {
                 // No top surfaces, no special handling needed
             } else {
-                // Adjust arachne input params to prevent removal of larger short walls, which could lead to gaps
-                Arachne::WallToolPathsParams input_params_tmp = input_params;
-                input_params_tmp.is_top_or_bottom_layer = true;
-                
                 // Use single-wall on top-surfaces if configured
                 if (loop_number > 0 && config->only_one_wall_top) {
+                    // Adjust arachne input params to prevent removal of larger short walls, which could lead to gaps
+                    Arachne::WallToolPathsParams input_params_tmp = input_params;
+                    input_params_tmp.is_top_or_bottom_layer = true;
+                
                     // Swap in the temporary storage
                     top_fills.swap(top_fills_tmp);
                     fill_clip.swap(fill_clip_tmp);
