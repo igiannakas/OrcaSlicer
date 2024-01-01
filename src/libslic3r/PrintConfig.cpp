@@ -866,7 +866,7 @@ void PrintConfigDef::init_fff_params()
 
     // the tooltip is copied from SuperStudio
     def = this->add("min_width_top_surface", coFloatOrPercent);
-    def->label = L("Top-surface threshold");
+    def->label = L("One wall threshold");
     def->category = L("Quality");
     def->tooltip = L("If a top surface has to be printed and it's partially covered by another layer, it won't be considered at a top layer where its width is below this value."
         " This can be useful to not let the 'one perimeter on top' trigger on surface that should be covered only by perimeters."
