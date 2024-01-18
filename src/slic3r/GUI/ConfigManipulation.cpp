@@ -521,10 +521,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, co
         apply(config, &new_conf);
     }
     toggle_line("reduce_wall_solid_infill",!have_ensure_vertical_thickness);
-
-    // Orca: Hide the filter out tiny gaps field when gap fill target is nowhere as no gap fill will be applied.
-    bool have_gap_fill = config->opt_enum<GapFillTarget>("gap_fill_target") != gftNowhere;
-    toggle_line("filter_out_gap_fill", have_gap_fill);
     
     bool have_perimeters = config->opt_int("wall_loops") > 0;
     for (auto el : { "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "detect_thin_wall", "detect_overhang_wall",
