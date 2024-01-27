@@ -1505,8 +1505,9 @@ void PerimeterGenerator::process_classic()
     for (size_t order_idx = 0; order_idx < surface_order.size(); order_idx++) {
         const Surface &surface = this->slices->surfaces[surface_order[order_idx]];
         // detect how many perimeters must be generated for this island
-        int        loop_number = this->config->wall_loops + surface.extra_perimeters - 1;  // 0-indexed loops
-        if (this->config->alternate_extra_wall && this->layer_id % 2 == 1 && !m_spiral_vase) // add alternating extra wall
+        int loop_number = this->config->wall_loops + surface.extra_perimeters - 1;  // 0-indexed loops
+        int sparse_infill_density = this->config->sparse_infill_density.value;
+        if (this->config->alternate_extra_wall && this->layer_id % 2 == 1 && !m_spiral_vase && sparse_infill_density > 0) // add alternating extra wall
             loop_number++;
         if (this->layer_id == 0 && this->config->only_one_wall_first_layer)
             loop_number = 0;
@@ -1940,9 +1941,10 @@ void PerimeterGenerator::process_arachne()
         coord_t bead_width_0 = ext_perimeter_spacing;
         // detect how many perimeters must be generated for this island
         int loop_number = this->config->wall_loops + surface.extra_perimeters - 1; // 0-indexed loops
-        if (this->config->alternate_extra_wall && this->layer_id % 2 == 1 && !m_spiral_vase) // add alternating extra wall
+        int sparse_infill_density = this->config->sparse_infill_density.value;
+        if (this->config->alternate_extra_wall && this->layer_id % 2 == 1 && !m_spiral_vase && sparse_infill_density > 0) // add alternating extra wall
             loop_number++;
-        
+
         // Set the bottommost layer to be one wall
         const bool is_bottom_layer = (this->layer_id == 0) ? true : false;
         if (is_bottom_layer && this->config->only_one_wall_first_layer)
@@ -1953,7 +1955,6 @@ void PerimeterGenerator::process_arachne()
         if (is_topmost_layer && loop_number > 0 && config->only_one_wall_top)
             loop_number = 0;
         // Orca: properly adjust offset for the outer wall if precise_outer_wall is enabled.
-
         ExPolygons last = offset_ex(surface.expolygon.simplify_p(surface_simplify_resolution),
                       config->precise_outer_wall ? -float(ext_perimeter_width - ext_perimeter_spacing )
                                                  : -float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
