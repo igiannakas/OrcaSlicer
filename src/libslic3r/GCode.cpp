@@ -5339,6 +5339,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
             comment += ";_EXTERNAL_PERIMETER";
     }
 
+    
+    
+    //IG: Placeholder
+    
+    
     if (!variable_speed) {
         // F is mm per minute.
         gcode += m_writer.set_speed(F, "", comment);
@@ -5630,6 +5635,8 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
         This is expressed in print coordinates, so it will need to be translated by
         this->origin in order to get G-code coordinates.  */
     Polyline travel { this->last_pos(), point };
+    
+    double previous_speed = m_writer.get_current_speed();
 
     // check whether a straight travel move would need retraction
     LiftType lift_type = LiftType::SpiralLift;
@@ -5664,6 +5671,49 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
         gcode += m_writer.set_travel_acceleration(acceleration_to_set);
         gcode += m_writer.set_jerk_xy(jerk_to_set);
     }
+    
+    // Get target acceleration and jerk values
+    double deccel_jerk_to_set = jerk_to_set;
+    unsigned int deccel_acceleration_to_set = acceleration_to_set;
+    
+    if (m_config.default_acceleration.value > 0) {
+        double deccel_acceleration_to_set_f;
+        if (this->on_first_layer() && m_config.initial_layer_acceleration.value > 0) {
+            deccel_acceleration_to_set_f = m_config.initial_layer_acceleration.value;
+        } else if (m_config.get_abs_value("bridge_acceleration") > 0 && is_bridge(role)) {
+            deccel_acceleration_to_set_f = m_config.get_abs_value("bridge_acceleration");
+        } else if (m_config.get_abs_value("sparse_infill_acceleration") > 0 && (role == erInternalInfill)) {
+            deccel_acceleration_to_set_f = m_config.get_abs_value("sparse_infill_acceleration");
+        } else if (m_config.get_abs_value("internal_solid_infill_acceleration") > 0 && (role == erSolidInfill)) {
+            deccel_acceleration_to_set_f = m_config.get_abs_value("internal_solid_infill_acceleration");
+        } else if (m_config.outer_wall_acceleration.value > 0 && is_external_perimeter(role)) {
+            deccel_acceleration_to_set_f = m_config.outer_wall_acceleration.value;
+        } else if (m_config.inner_wall_acceleration.value > 0 && is_internal_perimeter(role)) {
+            deccel_acceleration_to_set_f = m_config.inner_wall_acceleration.value;
+        } else if (m_config.top_surface_acceleration.value > 0 && is_top_surface(role)) {
+            deccel_acceleration_to_set_f = m_config.top_surface_acceleration.value;
+        } else {
+            deccel_acceleration_to_set_f = m_config.default_acceleration.value;
+        }
+        deccel_acceleration_to_set = (unsigned int)floor(deccel_acceleration_to_set_f + 0.5);
+    }
+    
+    if (m_config.default_jerk.value > 0) {
+        if (this->on_first_layer() && m_config.initial_layer_jerk.value > 0) {
+            deccel_jerk_to_set = m_config.initial_layer_jerk.value;
+        } else if (m_config.outer_wall_jerk.value > 0 && is_external_perimeter(role)) {
+            deccel_jerk_to_set = m_config.outer_wall_jerk.value;
+        } else if (m_config.inner_wall_jerk.value > 0 && is_internal_perimeter(role)) {
+            deccel_jerk_to_set = m_config.inner_wall_jerk.value;
+        } else if (m_config.top_surface_jerk.value > 0 && is_top_surface(role)) {
+            deccel_jerk_to_set = m_config.top_surface_jerk.value;
+        } else if (m_config.infill_jerk.value > 0 && is_infill(role)) {
+            deccel_jerk_to_set = m_config.infill_jerk.value;
+        }
+        else {
+            deccel_jerk_to_set = m_config.default_jerk.value;
+        }
+    }
 
     // if a retraction would be needed, try to use reduce_crossing_wall to plan a
     // multi-hop travel path inside the configuration space
@@ -5683,6 +5733,8 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
 
     // generate G-code for the travel move
     if (needs_retraction) {
+        // Orca: as we need to retract the last speed is set to 0 as retraction happens stationary
+        previous_speed = 0.f;
         if (m_config.reduce_crossing_wall && could_be_wipe_disabled)
             m_wipe.reset_path();
 
@@ -5717,9 +5769,36 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
         } else {
             if (travel.size() == 2) {
                 // No extra movements emitted by avoid_crossing_perimeters, simply move to the end point with z change
-                const auto& dest2d = this->point_to_gcode(travel.points.back());
+                auto length = travel.length();
+                Polyline *travel_1, *travel_2;
+                travel_1=new Polyline();
+                travel_2=new Polyline();
+                travel.split_at_length(length/2, travel_1, travel_2);
+                printf("Previous speed: %f\n", previous_speed);
+                auto travel_speed = this->on_first_layer() ? m_config.get_abs_value("initial_layer_travel_speed") : m_config.travel_speed.value;
+                
+                
+                
+                
+                const auto& dest2d = this->point_to_gcode(travel_1->points.back());
                 Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
+                gcode += ";Travel 1\n";
                 gcode += m_writer.travel_to_xyz(dest3d, comment + " travel_to_xyz");
+                
+                
+                
+                if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                    gcode += m_writer.set_accel_and_jerk(deccel_acceleration_to_set, deccel_jerk_to_set);
+                } else {
+                    gcode += m_writer.set_travel_acceleration(deccel_acceleration_to_set);
+                    gcode += m_writer.set_jerk_xy(deccel_jerk_to_set);
+                }
+                
+                gcode += ";Travel 2\n";
+                const auto& dest2d_2 = this->point_to_gcode(travel_2->points.back());
+                Vec3d dest3d_2(dest2d_2(0), dest2d_2(1), z == DBL_MAX ? m_nominal_z : z);
+                gcode += m_writer.travel_to_xyz(dest3d_2, comment + " travel_to_xyz");
+                
             } else {
                 // Extra movements emitted by avoid_crossing_perimeters, lift the z to normal height at the beginning, then apply the z
                 // ratio at the last point
