@@ -33,8 +33,10 @@ public:
     wxSize GetVideoSize() const;
 
     int GetLastError() const { return m_error; }
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wenum-constexpr-conversion"
     static constexpr wxMediaState MEDIASTATE_BUFFERING = (wxMediaState) 6;
+#pragma clang diagnostic pop
 
 protected:
     void DoSetSize(int x, int y, int width, int height, int sizeFlags) override;
