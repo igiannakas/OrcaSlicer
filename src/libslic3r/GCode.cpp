@@ -5338,11 +5338,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
         if (is_external_perimeter(path.role()))
             comment += ";_EXTERNAL_PERIMETER";
     }
-
-    
-    
-    //IG: Placeholder
-    
     
     if (!variable_speed) {
         // F is mm per minute.
@@ -5733,7 +5728,8 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
 
     // generate G-code for the travel move
     if (needs_retraction) {
-        // Orca: as we need to retract the last speed is set to 0 as retraction happens stationary
+        // Orca: Decelerate with target acceleration: If the toolhead needs to retract, the previous speed is reset to 0
+        // as the toolhead now needs to stop to retract.
         previous_speed = 0.f;
         if (m_config.reduce_crossing_wall && could_be_wipe_disabled)
             m_wipe.reset_path();
@@ -5768,36 +5764,43 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
             }
         } else {
             if (travel.size() == 2) {
-                // No extra movements emitted by avoid_crossing_perimeters, simply move to the end point with z change
-                auto length = travel.length();
-                Polyline *travel_1, *travel_2;
-                travel_1=new Polyline();
-                travel_2=new Polyline();
-                travel.split_at_length(length/2, travel_1, travel_2);
-                printf("Previous speed: %f\n", previous_speed);
-                auto travel_speed = this->on_first_layer() ? m_config.get_abs_value("initial_layer_travel_speed") : m_config.travel_speed.value;
+                // IG: Placeholder for UI option
+                if(false){
+                    // No extra movements emitted by avoid_crossing_perimeters, simply move to the end point with z change
+                    const auto& dest2d = this->point_to_gcode(travel.points.back());
+                    Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
+                    gcode += m_writer.travel_to_xyz(dest3d, comment + " travel_to_xyz");
+                }else{
+                    // ORCA: Decelerate with target acceleration
+                    // Length of the distance to travel
+                    auto length = travel.length();
+                    // Acceleration travel path and deceleration travel path.
+                    Polyline *travel_1, *travel_2;
+                    // initialize variables
+                    travel_1=new Polyline();
+                    travel_2=new Polyline();
+                    travel.split_at_length(length/2, travel_1, travel_2);
+                    printf("Previous speed: %f\n", previous_speed);
+                    auto travel_speed = this->on_first_layer() ? m_config.get_abs_value("initial_layer_travel_speed") : m_config.travel_speed.value;
                 
-                
-                
-                
-                const auto& dest2d = this->point_to_gcode(travel_1->points.back());
-                Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
-                gcode += ";Travel 1\n";
-                gcode += m_writer.travel_to_xyz(dest3d, comment + " travel_to_xyz");
-                
-                
-                
-                if (m_writer.get_gcode_flavor() == gcfKlipper) {
-                    gcode += m_writer.set_accel_and_jerk(deccel_acceleration_to_set, deccel_jerk_to_set);
-                } else {
-                    gcode += m_writer.set_travel_acceleration(deccel_acceleration_to_set);
-                    gcode += m_writer.set_jerk_xy(deccel_jerk_to_set);
+                    const auto& dest2d = this->point_to_gcode(travel_1->points.back());
+                    Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
+                    gcode += ";Travel 1\n";
+                    gcode += m_writer.travel_to_xyz(dest3d, comment + " travel_to_xyz");
+                    
+                    
+                    if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                        gcode += m_writer.set_accel_and_jerk(deccel_acceleration_to_set, deccel_jerk_to_set);
+                    } else {
+                        gcode += m_writer.set_travel_acceleration(deccel_acceleration_to_set);
+                        gcode += m_writer.set_jerk_xy(deccel_jerk_to_set);
+                    }
+                    
+                    gcode += ";Travel 2\n";
+                    const auto& dest2d_2 = this->point_to_gcode(travel_2->points.back());
+                    Vec3d dest3d_2(dest2d_2(0), dest2d_2(1), z == DBL_MAX ? m_nominal_z : z);
+                    gcode += m_writer.travel_to_xyz(dest3d_2, comment + " travel_to_xyz");
                 }
-                
-                gcode += ";Travel 2\n";
-                const auto& dest2d_2 = this->point_to_gcode(travel_2->points.back());
-                Vec3d dest3d_2(dest2d_2(0), dest2d_2(1), z == DBL_MAX ? m_nominal_z : z);
-                gcode += m_writer.travel_to_xyz(dest3d_2, comment + " travel_to_xyz");
                 
             } else {
                 // Extra movements emitted by avoid_crossing_perimeters, lift the z to normal height at the beginning, then apply the z
