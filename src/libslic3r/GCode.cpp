@@ -5660,17 +5660,21 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
             jerk_to_set = m_config.travel_jerk.value;
         }
     }
-    if (m_writer.get_gcode_flavor() == gcfKlipper) {
+    
+    // Orca: Removed setting the accelerations here to allow for implementation of the decel with target accel feature.
+    /*if (m_writer.get_gcode_flavor() == gcfKlipper) {
         gcode += m_writer.set_accel_and_jerk(acceleration_to_set, jerk_to_set);
     } else {
         gcode += m_writer.set_travel_acceleration(acceleration_to_set);
         gcode += m_writer.set_jerk_xy(jerk_to_set);
-    }
+    }*/
     
-    // Get target acceleration and jerk values
+    // Orca: Decelerate with target acceleration
+    // Get subsequent feature's acceleration and jerk values
     double deccel_jerk_to_set = jerk_to_set;
     unsigned int deccel_acceleration_to_set = acceleration_to_set;
-    
+    double target_speed=0.f;
+    //IG: ToDo: calculate the target speed based on the upcomming feature and whether we have retracted beforehand (meaning we need to come to a full stop to de-retract).
     if (m_config.default_acceleration.value > 0) {
         double deccel_acceleration_to_set_f;
         if (this->on_first_layer() && m_config.initial_layer_acceleration.value > 0) {
@@ -5731,6 +5735,16 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
         // Orca: Decelerate with target acceleration: If the toolhead needs to retract, the previous speed is reset to 0
         // as the toolhead now needs to stop to retract.
         previous_speed = 0.f;
+        
+        // Orca: Perform retraction with the travel speed as per default behaviour
+        // Moved the setting of acceleration here following introduction of the decel with target accel feature
+        if (m_writer.get_gcode_flavor() == gcfKlipper) {
+            gcode += m_writer.set_accel_and_jerk(acceleration_to_set, jerk_to_set);
+        } else {
+            gcode += m_writer.set_travel_acceleration(acceleration_to_set);
+            gcode += m_writer.set_jerk_xy(jerk_to_set);
+        }
+        
         if (m_config.reduce_crossing_wall && could_be_wipe_disabled)
             m_wipe.reset_path();
 
@@ -5759,13 +5773,30 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
     if (travel.size() >= 2) {
         if (m_spiral_vase) {
             // No lazy z lift for spiral vase mode
+            // Orca: Moved the setting of acceleration here following introduction of the decel with target accel feature
+            if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                gcode += m_writer.set_accel_and_jerk(acceleration_to_set, jerk_to_set);
+            } else {
+                gcode += m_writer.set_travel_acceleration(acceleration_to_set);
+                gcode += m_writer.set_jerk_xy(jerk_to_set);
+            }
+            
             for (size_t i = 1; i < travel.size(); ++i) {
                 gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[i]), comment + " travel_to_xy");
             }
         } else {
             if (travel.size() == 2) {
+                // Orca: Decel with target accel feature
+                // If the user has disabled the option, perform default actions
                 // IG: Placeholder for UI option
                 if(false){
+                    // Orca: Set travel acceleration
+                    if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                        gcode += m_writer.set_accel_and_jerk(acceleration_to_set, jerk_to_set);
+                    } else {
+                        gcode += m_writer.set_travel_acceleration(acceleration_to_set);
+                        gcode += m_writer.set_jerk_xy(jerk_to_set);
+                    }
                     // No extra movements emitted by avoid_crossing_perimeters, simply move to the end point with z change
                     const auto& dest2d = this->point_to_gcode(travel.points.back());
                     Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
@@ -5774,37 +5805,103 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
                     // ORCA: Decelerate with target acceleration
                     // Length of the distance to travel
                     auto length = travel.length();
-                    // Acceleration travel path and deceleration travel path.
-                    Polyline *travel_1, *travel_2;
-                    // initialize variables
-                    travel_1=new Polyline();
-                    travel_2=new Polyline();
-                    travel.split_at_length(length/2, travel_1, travel_2);
-                    printf("Previous speed: %f\n", previous_speed);
+                    // travel speed
                     auto travel_speed = this->on_first_layer() ? m_config.get_abs_value("initial_layer_travel_speed") : m_config.travel_speed.value;
-                
-                    const auto& dest2d = this->point_to_gcode(travel_1->points.back());
-                    Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
-                    gcode += ";Travel 1\n";
-                    gcode += m_writer.travel_to_xyz(dest3d, comment + " travel_to_xyz");
+            
+                    // Calculate ideal acceleration distance
+                    const double extrude2travel_speed_diff = previous_speed >= travel_speed ? 0 : (travel_speed - previous_speed);
+                    const double seconds_to_go_travel_speed = (extrude2travel_speed_diff / acceleration_to_set);
+                    const coordf_t dist_to_go_travel_speed = scaled(seconds_to_go_travel_speed * (travel_speed - extrude2travel_speed_diff/2));
                     
+                    // Calculate ideal deceleration distance
+                    const double travel2extrude_speed_diff = target_speed >= travel_speed ? 0 : (travel_speed - target_speed);
+                    const double seconds_to_go_extrude_speed = (travel2extrude_speed_diff / deccel_acceleration_to_set);
+                    const coordf_t dist_to_go_extrude_speed = scaled(seconds_to_go_extrude_speed * (travel_speed - travel2extrude_speed_diff / 2));
                     
-                    if (m_writer.get_gcode_flavor() == gcfKlipper) {
-                        gcode += m_writer.set_accel_and_jerk(deccel_acceleration_to_set, deccel_jerk_to_set);
-                    } else {
-                        gcode += m_writer.set_travel_acceleration(deccel_acceleration_to_set);
-                        gcode += m_writer.set_jerk_xy(deccel_jerk_to_set);
+                    // acceleration to go from previous speed to the new one without going by the travel speed
+                    const double extrude2extrude_speed_diff = std::abs(previous_speed - target_speed);
+                    const double accel_extrude2extrude = extrude2extrude_speed_diff * (previous_speed + target_speed) / (2 * length);
+                    
+                    // Don't use travel acceleration if the distance is too small, instead use subsequent feature acceleration value as the travel acceleration
+                    coordf_t min_dist_for_deceleration = coordf_t(SCALED_EPSILON);
+                    min_dist_for_deceleration = std::max(min_dist_for_deceleration, dist_to_go_extrude_speed / 10);
+                    bool cant_use_deceleration = length < min_dist_for_deceleration;
+                    
+                    // Don't use travel acceleration if there isn't enough acceleration to go to the next speed without going by the travel speed
+                    cant_use_deceleration = cant_use_deceleration || accel_extrude2extrude * 1.1 > acceleration_to_set;
+                    
+                    // Don't use travel acceleration if the travel speed isn't high enough vs next speed
+                    cant_use_deceleration = cant_use_deceleration || dist_to_go_extrude_speed < coordf_t(SCALED_EPSILON);
+                    
+                    // Don't use travel acceleration if the travel accel is less than the subsequent feature acceleration value
+                    // IG: To-Do- possibly disable this
+                    if(deccel_acceleration_to_set > acceleration_to_set) cant_use_deceleration = true;
+                    
+                    if(cant_use_deceleration){
+                        // Orca: Set deceleration value to use the subsequent move's acceleration value. Dont travel
+                        // with travel acceleration as we cannot decelerate with the target value in the space available.
+                        if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                            gcode += m_writer.set_accel_and_jerk(deccel_acceleration_to_set, deccel_jerk_to_set);
+                        } else {
+                            gcode += m_writer.set_travel_acceleration(deccel_acceleration_to_set);
+                            gcode += m_writer.set_jerk_xy(deccel_jerk_to_set);
+                        }
+                        const auto& dest2d = this->point_to_gcode(travel.points.back());
+                        Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
+                        gcode += m_writer.travel_to_xyz(dest3d, comment + " travel_to_xyz");
+                    }else{
+                        printf("CAN!\n\n");
+                        // Needed deceleration distance
+                        Polyline decel_travel;
+                        const coordf_t needed_decel_length = dist_to_go_extrude_speed + min_dist_for_deceleration;
+                        
+                        double ratio = (dist_to_go_travel_speed + 1) / (dist_to_go_travel_speed + dist_to_go_extrude_speed + 1);
+                        
+                        decel_travel = travel;
+                        travel.clip_end(length  * ratio);
+                        decel_travel.clip_start(length * (1-ratio));
+
+                        
+                        const auto& dest2d = this->point_to_gcode(travel.points.back());
+                        Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
+                        gcode += ";IOANNIS: Travel 1: Decel: \n";
+                        
+                        if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                            gcode += m_writer.set_accel_and_jerk(acceleration_to_set, jerk_to_set);
+                        } else {
+                            gcode += m_writer.set_travel_acceleration(acceleration_to_set);
+                            gcode += m_writer.set_jerk_xy(jerk_to_set);
+                        }
+                        
+                        gcode += m_writer.travel_to_xyz(dest3d, comment + " travel_to_xyz");
+                        
+                        // Orca: Set deceleration value to use the subsequent move's acceleration value
+                        if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                            gcode += m_writer.set_accel_and_jerk(deccel_acceleration_to_set, deccel_jerk_to_set);
+                        } else {
+                            gcode += m_writer.set_travel_acceleration(deccel_acceleration_to_set);
+                            gcode += m_writer.set_jerk_xy(deccel_jerk_to_set);
+                        }
+                        
+                        gcode += ";Travel 2\n";
+                        const auto& dest2d_2 = this->point_to_gcode(decel_travel.points.back());
+                        Vec3d dest3d_2(dest2d_2(0), dest2d_2(1), z == DBL_MAX ? m_nominal_z : z);
+                        gcode += m_writer.travel_to_xyz(dest3d_2, comment + " travel_to_xyz");
                     }
-                    
-                    gcode += ";Travel 2\n";
-                    const auto& dest2d_2 = this->point_to_gcode(travel_2->points.back());
-                    Vec3d dest3d_2(dest2d_2(0), dest2d_2(1), z == DBL_MAX ? m_nominal_z : z);
-                    gcode += m_writer.travel_to_xyz(dest3d_2, comment + " travel_to_xyz");
                 }
                 
             } else {
                 // Extra movements emitted by avoid_crossing_perimeters, lift the z to normal height at the beginning, then apply the z
                 // ratio at the last point
+                // Orca: Decel with target accel: Perform retraction with the travel speed as per default behaviour
+                if(true){
+                    if (m_writer.get_gcode_flavor() == gcfKlipper) {
+                        gcode += m_writer.set_accel_and_jerk(acceleration_to_set, jerk_to_set);
+                    } else {
+                        gcode += m_writer.set_travel_acceleration(acceleration_to_set);
+                        gcode += m_writer.set_jerk_xy(jerk_to_set);
+                    }
+                }
                 for (size_t i = 1; i < travel.size(); ++i) {
                     if (i == 1) {
                         // Lift to normal z at beginning
