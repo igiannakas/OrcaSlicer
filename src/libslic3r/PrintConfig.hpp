@@ -96,7 +96,6 @@ enum class WallSequence {
     InnerOuter,
     OuterInner,
     InnerOuterInner,
-    MiddleOuterInner,
     Count,
 };
 
