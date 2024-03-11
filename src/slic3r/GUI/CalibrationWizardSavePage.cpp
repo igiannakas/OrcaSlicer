@@ -261,11 +261,9 @@ void CaliPASaveAutoPanel::sync_cali_result(const std::vector<PACalibResult>& cal
         static std::vector<PACalibResult> filtered_results;
         filtered_results.clear();
         for (auto history : history_result) {
-            for (auto& info : m_obj->selected_cali_preset) {
-                if (history.filament_id == info.filament_id) {
-                    filtered_results.push_back(history);
-                    selections.push_back(from_u8(history.name));
-                }
+            if (history.filament_id == item.filament_id) {
+                filtered_results.push_back(history);
+                selections.push_back(from_u8(history.name));
             }
         }
         comboBox_tray_name->Set(selections);
@@ -1396,12 +1394,10 @@ void CalibrationFlowCoarseSavePage::on_cali_finished_job()
 void CalibrationFlowCoarseSavePage::on_cali_cancel_job()
 {
     BOOST_LOG_TRIVIAL(info) << "CalibrationWizard::print_job: enter canceled";
-    if (CalibUtils::print_job) {
-        if (CalibUtils::print_job->is_running()) {
-            BOOST_LOG_TRIVIAL(info) << "calibration_print_job: canceled";
-            CalibUtils::print_job->cancel();
-        }
-        CalibUtils::print_job->join();
+    if (CalibUtils::print_worker) {
+        BOOST_LOG_TRIVIAL(info) << "calibration_print_job: canceled";
+        CalibUtils::print_worker->cancel_all();
+        CalibUtils::print_worker->wait_for_idle();
     }
 
     m_sending_panel->reset();

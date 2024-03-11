@@ -1,6 +1,7 @@
 #include "Model.hpp"
 #include "Print.hpp"
 
+#include <boost/log/trivial.hpp>
 #include <cfloat>
 
 namespace Slic3r {
@@ -839,7 +840,7 @@ void update_volume_bboxes(
                         layer_range.volumes.emplace_back(*it);
                 } else
                     layer_range.volumes.push_back({ model_volume->id(),
-                        transformed_its_bbox2d(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix(false)), offset) });
+                        transformed_its_bbox2d(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix()), offset) });
             }
     } else {
         std::vector<std::vector<PrintObjectRegions::VolumeExtents>> volumes_old;
@@ -871,7 +872,7 @@ void update_volume_bboxes(
                             layer_range.volumes.emplace_back(*it);
                     }
                 } else {
-                    transformed_its_bboxes_in_z_ranges(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix(false)), ranges, bboxes, offset);
+                    transformed_its_bboxes_in_z_ranges(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix()), ranges, bboxes, offset);
                     for (PrintObjectRegions::LayerRangeRegions &layer_range : layer_ranges)
                         if (auto &bbox = bboxes[&layer_range - layer_ranges.data()]; bbox.second)
                             layer_range.volumes.push_back({ model_volume->id(), bbox.first });
@@ -1039,6 +1040,24 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         m_support_used = true;
     else
         m_support_used = false;
+
+    {
+        const auto& o = model.objects;
+        const auto opt_has_scarf_joint_seam = [](const DynamicConfig& c) {
+            return c.has("seam_slope_type") && c.opt_enum<SeamScarfType>("seam_slope_type") != SeamScarfType::None;
+        };
+        const bool has_scarf_joint_seam = std::any_of(o.begin(), o.end(), [&new_full_config, &opt_has_scarf_joint_seam](ModelObject* obj) {
+            return obj->get_config_value<ConfigOptionEnum<SeamScarfType>>(new_full_config, "seam_slope_type")->value != SeamScarfType::None ||
+                   std::any_of(obj->volumes.begin(), obj->volumes.end(), [&opt_has_scarf_joint_seam](const ModelVolume* v) { return opt_has_scarf_joint_seam(v->config.get());}) ||
+                   std::any_of(obj->layer_config_ranges.begin(), obj->layer_config_ranges.end(), [&opt_has_scarf_joint_seam](const auto& r) { return opt_has_scarf_joint_seam(r.second.get());});
+        });
+
+        if (has_scarf_joint_seam) {
+            new_full_config.set("has_scarf_joint_seam", true);
+        }
+
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", has_scarf_joint_seam:" << has_scarf_joint_seam;
+    }
 
     // Find modified keys of the various configs. Resolve overrides extruder retract values by filament profiles.
     DynamicPrintConfig   filament_overrides;

@@ -4,6 +4,7 @@
 #include "GUI_ObjectList.hpp"
 #include "GUI_Factories.hpp"
 #include "format.hpp"
+#include "libslic3r_version.h"
 
 // Localization headers: include libslic3r version first so everything in this file
 // uses the slic3r/GUI version (the macros will take precedence over the functions).
@@ -27,6 +28,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/convert.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 
 #include <wx/stdpaths.h>
 #include <wx/imagpng.h>
@@ -1027,8 +1030,12 @@ void GUI_App::post_init()
         // BOOST_LOG_TRIVIAL(info) << "Loading user presets...";
         // scrn->SetText(_L("Loading user presets..."));
         if (m_agent) { start_sync_user_preset(); }
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " sync_user_preset: true";
+    } else {
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " sync_user_preset: false";
     }
 
+    m_open_method = "double_click";
     bool switch_to_3d = false;
     if (!this->init_params->input_files.empty()) {
 
@@ -1052,6 +1059,7 @@ void GUI_App::post_init()
             if (!download_file_url.empty() && ( boost::starts_with(download_file_url, "http://") ||  boost::starts_with(download_file_url, "https://")) ) {
                 request_model_download(download_origin_url);
             }
+            m_open_method = "makerworld";
         }
         else {
             switch_to_3d = true;
@@ -1059,22 +1067,27 @@ void GUI_App::post_init()
                 mainframe->select_tab(size_t(MainFrame::tp3DEditor));
                 plater_->select_view_3D("3D");
                 this->plater()->load_gcode(from_u8(this->init_params->input_files.front()));
+                m_open_method = "gcode";
             }
             else {
                 mainframe->select_tab(size_t(MainFrame::tp3DEditor));
                 plater_->select_view_3D("3D");
-                Plater::TakeSnapshot      snapshot(this->plater(), "Load Project", UndoRedo::SnapshotType::ProjectSeparator);
-                const std::vector<size_t> res = this->plater()->load_files(this->init_params->input_files);
-                if (!res.empty()) {
-                    if (this->init_params->input_files.size() == 1) {
-                        // Update application titlebar when opening a project file
-                        const std::string& filename = this->init_params->input_files.front();
-                        this->plater()->up_to_date(true, false);
-                        this->plater()->up_to_date(true, true);
-                        //BBS: remove amf logic as project
-                        if (boost::algorithm::iends_with(filename, ".3mf"))
-                            this->plater()->set_project_filename(from_u8(filename));
+                wxArrayString input_files;
+                for (auto & file : this->init_params->input_files) {
+                    input_files.push_back(wxString::FromUTF8(file));
+                }
+                this->plater()->set_project_filename(_L("Untitled"));
+                this->plater()->load_files(input_files);
+                try {
+                    if (!input_files.empty()) {
+                        std::string file_path = input_files.front().ToStdString();
+                        std::filesystem::path path(file_path);
+                        m_open_method = "file_" + path.extension().string();
                     }
+                }
+                catch (...) {
+                    BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ", file path exception!";
+                    m_open_method = "file";
                 }
             }
         }
@@ -1198,9 +1211,6 @@ void GUI_App::post_init()
     // This is ugly but I honestly found no better way to do it.
     // Neither wxShowEvent nor wxWindowCreateEvent work reliably.
     if (this->preset_updater) { // G-Code Viewer does not initialize preset_updater.
-        BOOST_LOG_TRIVIAL(info) << "before check_updates";
-        this->check_updates(false);
-        BOOST_LOG_TRIVIAL(info) << "after check_updates";
         CallAfter([this] {
             bool cw_showed = this->config_wizard_startup();
 
@@ -2107,6 +2117,9 @@ void GUI_App::init_app_config()
         if (!boost::filesystem::exists(data_dir_path)){
             boost::filesystem::create_directory(data_dir_path);
         }
+
+        // Change current dirtory of application
+        chdir(encode_path((Slic3r::data_dir() + "/log").c_str()).c_str());
     } else {
         m_datadir_redefined = true;
     }
@@ -2652,7 +2665,7 @@ bool GUI_App::on_init_inner()
 
     sidebar().obj_list()->init();
     //sidebar().aux_list()->init_auxiliary();
-    //mainframe->m_auxiliary->init_auxiliary();
+    mainframe->m_project->init_auxiliary();
 
 //     update_mode(); // !!! do that later
     SetTopWindow(mainframe);
@@ -3181,14 +3194,17 @@ void GUI_App::UpdateDVCDarkUI(wxDataViewCtrl* dvc, bool highlited/* = false*/)
     UpdateDarkUI(dvc, highlited ? dark_mode() : false);
 #ifdef _MSW_DARK_MODE
     //dvc->RefreshHeaderDarkMode(&m_normal_font);
-    HWND hwnd = (HWND)dvc->GenericGetHeader()->GetHandle();
-    hwnd = GetWindow(hwnd, GW_CHILD);
-    if (hwnd != NULL)
-        NppDarkMode::SetDarkListViewHeader(hwnd);
-    wxItemAttr attr;
-    attr.SetTextColour(NppDarkMode::GetTextColor());
-    attr.SetFont(m_normal_font);
-    dvc->SetHeaderAttr(attr);
+    HWND hwnd;
+    if (!dvc->HasFlag(wxDV_NO_HEADER)) {
+        hwnd = (HWND) dvc->GenericGetHeader()->GetHandle();
+        hwnd = GetWindow(hwnd, GW_CHILD);
+        if (hwnd != NULL)
+            NppDarkMode::SetDarkListViewHeader(hwnd);
+        wxItemAttr attr;
+        attr.SetTextColour(NppDarkMode::GetTextColor());
+        attr.SetFont(m_normal_font);
+        dvc->SetHeaderAttr(attr);
+    }
 #endif //_MSW_DARK_MODE
     if (dvc->HasFlag(wxDV_ROW_LINES))
         dvc->SetAlternateRowColour(m_color_highlight_default);
@@ -3293,17 +3309,8 @@ void GUI_App::link_to_network_check()
     else if (country_code == "CN") {
         url = "https://status.bambulab.cn";
     }
-    else if (country_code == "ENV_CN_DEV") {
-        url = "https://status.bambu-lab.com";
-    }
-    else if (country_code == "ENV_CN_QA") {
-        url = "https://status.bambu-lab.com";
-    }
-    else if (country_code == "ENV_CN_PRE") {
-        url = "https://status.bambu-lab.com";
-    }
     else {
-        url = "https://status.bambu-lab.com";
+        url = "https://status.bambulab.com";
     }
     wxLaunchDefaultBrowser(url);
 }
@@ -3751,8 +3758,7 @@ void GUI_App::request_user_logout()
         bool     transfer_preset_changes = false;
         wxString header = _L("Some presets are modified.") + "\n" +
             _L("You can keep the modifield presets to the new project, discard or save changes as new presets.");
-        using ab        = UnsavedChangesDialog::ActionButtons;
-        wxGetApp().check_and_keep_current_preset_changes(_L("User logged out"), header, ab::KEEP | ab::SAVE, &transfer_preset_changes);
+        wxGetApp().check_and_keep_current_preset_changes(_L("User logged out"), header, ActionButtons::KEEP | ActionButtons::SAVE, &transfer_preset_changes);
 
         m_device_manager->clean_user_info();
         GUI::wxGetApp().sidebar().load_ams_list({}, {});
@@ -4156,6 +4162,10 @@ void GUI_App::check_track_enable()
         /* record studio start event */
         json j;
         j["user_mode"] = this->get_mode_str();
+        j["open_method"] = m_open_method;
+        if (m_agent) {
+            m_agent->track_event("studio_launch", j.dump());
+        }
     }
 }
 
@@ -4287,7 +4297,8 @@ Semver get_version(const std::string& str, const std::regex& regexp) {
 void GUI_App::check_new_version_sf(bool show_tips, int by_user)
 {
     AppConfig* app_config = wxGetApp().app_config;
-    auto version_check_url = app_config->version_check_url();
+    bool       check_stable_only = app_config->get_bool("check_stable_update_only");
+    auto       version_check_url = app_config->version_check_url(check_stable_only);
     Http::get(version_check_url)
         .on_error([&](std::string body, std::string error, unsigned http_status) {
           (void)body;
@@ -4295,25 +4306,22 @@ void GUI_App::check_new_version_sf(bool show_tips, int by_user)
                                              error);
         })
         .timeout_connect(1)
-        .on_complete([this,by_user](std::string body, unsigned http_status) {
+        .on_complete([this,by_user, check_stable_only](std::string body, unsigned http_status) {
           // Http response OK
           if (http_status != 200)
             return;
           try {
             boost::trim(body);
-            // SoftFever: parse github release, ported from SS
-
+            // Orca: parse github release, inspired by SS
             boost::property_tree::ptree root;
-
             std::stringstream json_stream(body);
             boost::property_tree::read_json(json_stream, root);
 
-            bool i_am_pre = false;
             // at least two number, use '.' as separator. can be followed by -Az23 for prereleased and +Az42 for
             // metadata
             std::regex matcher("[0-9]+\\.[0-9]+(\\.[0-9]+)*(-[A-Za-z0-9]+)?(\\+[A-Za-z0-9]+)?");
 
-            Semver current_version = get_version(SoftFever_VERSION, matcher);
+            Semver           current_version = get_version(SoftFever_VERSION, matcher);
             Semver best_pre(1, 0, 0);
             Semver best_release(1, 0, 0);
             std::string best_pre_url;
@@ -4321,56 +4329,73 @@ void GUI_App::check_new_version_sf(bool show_tips, int by_user)
             std::string best_release_content;
             std::string best_pre_content;
             const std::regex reg_num("([0-9]+)");
-            std::string tag = root.get<std::string>("tag_name");
-            if (tag[0] == 'v')
-            tag.erase(0, 1);
-            for (std::regex_iterator it = std::sregex_iterator(tag.begin(), tag.end(), reg_num);
-                it != std::sregex_iterator(); ++it) {
-            }
-            Semver tag_version = get_version(tag, matcher);
-            if (current_version == tag_version)
-            i_am_pre = root.get<bool>("prerelease");
-            if (root.get<bool>("prerelease")) {
-            if (best_pre < tag_version) {
-                best_pre = tag_version;
-                best_pre_url = root.get<std::string>("html_url");
-                best_pre_content = root.get<std::string>("body");
-                best_pre.set_prerelease("Preview");
-            }
+            if (check_stable_only) {
+                std::string tag = root.get<std::string>("tag_name");
+                if (tag[0] == 'v')
+                    tag.erase(0, 1);
+                for (std::regex_iterator it = std::sregex_iterator(tag.begin(), tag.end(), reg_num); it != std::sregex_iterator(); ++it) {}
+                Semver tag_version = get_version(tag, matcher);
+                if (root.get<bool>("prerelease")) {
+                    if (best_pre < tag_version) {
+                        best_pre         = tag_version;
+                        best_pre_url     = root.get<std::string>("html_url");
+                        best_pre_content = root.get<std::string>("body");
+                        best_pre.set_prerelease("Preview");
+                    }
+                } else {
+                    if (best_release < tag_version) {
+                        best_release         = tag_version;
+                        best_release_url     = root.get<std::string>("html_url");
+                        best_release_content = root.get<std::string>("body");
+                    }
+                }
             } else {
-            if (best_release < tag_version) {
-                best_release = tag_version;
-                best_release_url = root.get<std::string>("html_url");
-                best_release_content = root.get<std::string>("body");
-            }
+                for (auto json_version : root) {
+                    std::string tag = json_version.second.get<std::string>("tag_name");
+                    if (tag[0] == 'v')
+                        tag.erase(0, 1);
+                    for (std::regex_iterator it = std::sregex_iterator(tag.begin(), tag.end(), reg_num); it != std::sregex_iterator();
+                         ++it) {}
+                    Semver tag_version = get_version(tag, matcher);
+                    if (json_version.second.get<bool>("prerelease")) {
+                        if (best_pre < tag_version) {
+                            best_pre         = tag_version;
+                            best_pre_url     = json_version.second.get<std::string>("html_url");
+                            best_pre_content = json_version.second.get<std::string>("body");
+                            best_pre.set_prerelease("Preview");
+                        }
+                    } else {
+                        if (best_release < tag_version) {
+                            best_release         = tag_version;
+                            best_release_url     = json_version.second.get<std::string>("html_url");
+                            best_release_content = json_version.second.get<std::string>("body");
+                        }
+                    }
+                }
             }
 
             // if release is more recent than beta, use release anyway
             if (best_pre < best_release) {
-              best_pre = best_release;
-              best_pre_url = best_release_url;
-              best_pre_content = best_release_content;
+                best_pre         = best_release;
+                best_pre_url     = best_release_url;
+                best_pre_content = best_release_content;
             }
             // if we're the most recent, don't do anything
-            if ((i_am_pre ? best_pre : best_release) <= current_version) {
-              if (by_user != 0)
-                this->no_new_version();
-              return;
+            if ((check_stable_only ? best_release : best_pre) <= current_version) {
+                if (by_user != 0)
+                    this->no_new_version();
+                return;
             }
 
-            // BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...",
-            // SLIC3R_APP_NAME, i_am_pre ? best_pre.to_string(): best_release.to_string());
-
-            version_info.url = i_am_pre ? best_pre_url : best_release_url;
-            version_info.version_str = i_am_pre ? best_pre.to_string() : best_release.to_string_sf();
-            version_info.description = i_am_pre ? best_pre_content : best_release_content;
+            version_info.url           = check_stable_only ? best_release_url : best_pre_url;
+            version_info.version_str   = check_stable_only ? best_release.to_string_sf() : best_pre.to_string();
+            version_info.description   = check_stable_only ? best_release_content : best_pre_content;
             version_info.force_upgrade = false;
 
-            wxCommandEvent *evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
-            evt->SetString((i_am_pre ? best_pre : best_release).to_string());
+            wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
+            evt->SetString((check_stable_only ? best_release : best_pre).to_string());
             GUI::wxGetApp().QueueEvent(evt);
-          } catch (...) {
-          }
+          } catch (...) {}
         })
         .perform();
 }
@@ -4588,8 +4613,7 @@ void GUI_App::sync_preset(Preset* preset)
                 if (http_code >= 400) {
                     result = 0;
                     updated_info = "hold";
-                }
-                else
+                } else
                     result = -1;
             }
         }
@@ -4611,8 +4635,7 @@ void GUI_App::sync_preset(Preset* preset)
                 auto update_time_str = values_map[BBL_JSON_KEY_UPDATE_TIME];
                 if (!update_time_str.empty())
                     update_time = std::atoll(update_time_str.c_str());
-            }
-            else {
+            } else {
                 BOOST_LOG_TRIVIAL(trace) << "[sync_preset]create: request_setting_id failed, http code "<<http_code;
                 // do not post new preset this time if http code >= 400
                 if (http_code >= 400) {
@@ -4622,12 +4645,10 @@ void GUI_App::sync_preset(Preset* preset)
                 else
                     result = -1;
             }
-        }
-        else {
+        } else {
             BOOST_LOG_TRIVIAL(trace) << "[sync_preset]create: can not generate differed preset";
         }
-    }
-    else if (preset->sync_info.compare("update") == 0) {
+    } else if (preset->sync_info.compare("update") == 0) {
         if (!setting_id.empty()) {
             int ret = preset_bundle->get_differed_values_to_update(*preset, values_map);
             if (!ret) {
@@ -4721,7 +4742,7 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
         cancelFn = [this, dlg]() {
             return m_is_closing || dlg->WasCanceled();
         };
-        finishFn = [this, userid = m_agent->get_user_id(), dlg, t = std::weak_ptr(m_user_sync_token)](bool ok) {
+        finishFn = [this, userid = m_agent->get_user_id(), dlg, t = std::weak_ptr<int>(m_user_sync_token)](bool ok) {
             CallAfter([=]{
                 dlg->Destroy();
                 if (ok && m_agent && t.lock() == m_user_sync_token && userid == m_agent->get_user_id()) reload_settings();
@@ -4729,7 +4750,7 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
         };
     }
     else {
-        finishFn = [this, userid = m_agent->get_user_id(), t = std::weak_ptr(m_user_sync_token)](bool ok) {
+        finishFn = [this, userid = m_agent->get_user_id(), t = std::weak_ptr<int>(m_user_sync_token)](bool ok) {
             CallAfter([=] {
                 if (ok && m_agent && t.lock() == m_user_sync_token && userid == m_agent->get_user_id()) reload_settings();
             });
@@ -4737,7 +4758,7 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
     }
 
     m_sync_update_thread = Slic3r::create_thread(
-        [this, progressFn, cancelFn, finishFn, t = std::weak_ptr(m_user_sync_token)] {
+        [this, progressFn, cancelFn, finishFn, t = std::weak_ptr<int>(m_user_sync_token)] {
             // get setting list, update setting list
             std::string version = preset_bundle->get_vendor_profile_version(PresetBundle::BBL_BUNDLE).to_string();
             int ret = m_agent->get_setting_list2(version, [this](auto info) {
@@ -4802,7 +4823,8 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 
                         if (total_count == 0) {
                             CallAfter([this] {
-                                plater()->get_notification_manager()->close_notification_of_type(NotificationType::BBLUserPresetExceedLimit);
+                                if (!m_is_closing)
+                                    plater()->get_notification_manager()->close_notification_of_type(NotificationType::BBLUserPresetExceedLimit);
                             });
                         }
 
@@ -5024,7 +5046,7 @@ bool GUI_App::select_language()
             // 3) new_language_info->CanonicalName is a safe bet. It points to a valid dictionary name.
 			app_config->set("language", new_language_info->CanonicalName.ToUTF8().data());
     		return true;
-    	}
+        }
     }
 
     return false;
@@ -5587,11 +5609,11 @@ std::vector<std::pair<unsigned int, std::string>> GUI_App::get_selected_presets(
 bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, const wxString& header, bool remember_choice/* = true*/, bool dont_save_insted_of_discard/* = false*/)
 {
     if (has_current_preset_changes()) {
-        int act_buttons = UnsavedChangesDialog::ActionButtons::SAVE;
+        int act_buttons = ActionButtons::SAVE;
         if (dont_save_insted_of_discard)
-            act_buttons |= UnsavedChangesDialog::ActionButtons::DONT_SAVE;
+            act_buttons |= ActionButtons::DONT_SAVE;
         if (remember_choice)
-            act_buttons |= UnsavedChangesDialog::ActionButtons::REMEMBER_CHOISE;
+            act_buttons |= ActionButtons::REMEMBER_CHOISE;
         UnsavedChangesDialog dlg(caption, header, "", act_buttons);
         if (dlg.ShowModal() == wxID_CANCEL)
             return false;
@@ -5863,7 +5885,7 @@ void GUI_App::OSXStoreOpenFiles(const wxArrayString &fileNames)
 
 void GUI_App::MacOpenURL(const wxString& url)
 {
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "get mac url " << url;
+    BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << "get mac url " << url;
 
     if (!url.empty() && boost::starts_with(url, "orcasliceropen://")) {
         auto input_str_arr = split_str(url.ToStdString(), "orcasliceropen://");
@@ -5874,7 +5896,7 @@ void GUI_App::MacOpenURL(const wxString& url)
         }
 
         std::string download_file_url = url_decode(download_origin_url);
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << download_file_url;
+        BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << download_file_url;
         if (!download_file_url.empty() && (boost::starts_with(download_file_url, "http://") || boost::starts_with(download_file_url, "https://"))) {
 
             if (m_post_initialized) {
@@ -5932,18 +5954,15 @@ void GUI_App::MacOpenFiles(const wxArrayString &fileNames)
                     input_files.push_back(non_gcode_files[i]);
                 }
                 this->plater()->load_files(input_files);
-            }
-            else {
+            } else {
                 for (size_t i = 0; i < files.size(); ++i) {
                     this->init_params->input_files.emplace_back(files[i]);
                 }
             }
-        }
-        else {
+        } else {
             if (m_post_initialized) {
                 this->plater()->load_gcode(gcode_files.front());
-            }
-            else {
+            } else {
                 this->init_params->input_gcode = true;
                 this->init_params->input_files = { into_u8(gcode_files.front()) };
             }
@@ -6047,6 +6066,12 @@ void GUI_App::open_mall_page_dialog()
 
     if (result < 0) {
        link_url = host_url + model_url;
+    }
+
+    if (link_url.find("?") != std::string::npos) {
+        link_url += "&from=orcaslicer";
+    } else {
+        link_url += "?from=orcaslicer";
     }
 
     wxLaunchDefaultBrowser(link_url);
@@ -6292,8 +6317,7 @@ void GUI_App::gcode_thumbnails_debug()
                     width = 0;
                     height = 0;
                     rows.clear();
-                }
-                else if (reading_image)
+                } else if (reading_image)
                     row += gcode_line.substr(2);
             }
         }

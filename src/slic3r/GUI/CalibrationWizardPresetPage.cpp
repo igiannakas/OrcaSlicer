@@ -1437,12 +1437,10 @@ void CalibrationPresetPage::on_cali_finished_job()
 void CalibrationPresetPage::on_cali_cancel_job()
 {
     BOOST_LOG_TRIVIAL(info) << "CalibrationWizard::print_job: enter canceled";
-    if (CalibUtils::print_job) {
-        if (CalibUtils::print_job->is_running()) {
-            BOOST_LOG_TRIVIAL(info) << "calibration_print_job: canceled";
-            CalibUtils::print_job->cancel();
-        }
-        CalibUtils::print_job->join();
+    if (CalibUtils::print_worker) {
+        BOOST_LOG_TRIVIAL(info) << "calibration_print_job: canceled";
+        CalibUtils::print_worker->cancel_all();
+        CalibUtils::print_worker->wait_for_idle();
     }
 
     m_sending_panel->reset();
@@ -1792,7 +1790,10 @@ Preset* CalibrationPresetPage::get_printer_preset(MachineObject* obj, float nozz
         if (printer_nozzle_opt)
             printer_nozzle_vals = dynamic_cast<ConfigOptionFloats*>(printer_nozzle_opt);
         std::string model_id = printer_it->get_current_printer_type(preset_bundle);
-        if (model_id.compare(obj->printer_type) == 0
+
+        std::string printer_type = obj->printer_type;
+        if (obj->is_support_p1s_plus) { printer_type = "C12"; }
+        if (model_id.compare(printer_type) == 0
             && printer_nozzle_vals
             && abs(printer_nozzle_vals->get_at(0) - nozzle_value) < 1e-3) {
             printer_preset = &(*printer_it);

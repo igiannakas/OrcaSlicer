@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include <mutex>
 #include <boost/thread.hpp>
 #include <boost/nowide/fstream.hpp>
 #include "nlohmann/json.hpp"
@@ -192,6 +193,7 @@ public:
     std::string     nozzle_temp_min;
     std::string     xcam_info;
     std::string     uuid;
+    int             ctype = 0;
     float           k = 0.0f;       // k range: 0 ~ 0.5
     float           n = 0.0f;       // k range: 0.6 ~ 2.0
     int             cali_idx = 0;
@@ -363,6 +365,10 @@ public:
         std::string hw_ver;
         std::string sw_ver;
         std::string sw_new_ver;
+        int         firmware_status;
+        ModuleVersionInfo() :firmware_status(0) {
+
+        };
     };
 
     enum SdcardState {
@@ -446,6 +452,7 @@ public:
     std::string bind_user_id;
     std::string bind_state;     /* free | occupied */
     std::string bind_sec_link;
+    std::string bind_ssdp_version;
     bool is_avaliable() { return bind_state == "free"; }
     time_t last_alive;
     bool m_is_online;
@@ -457,6 +464,7 @@ public:
     int  parse_msg_count = 0;
     int  keep_alive_count = 0;
     std::chrono::system_clock::time_point   last_update_time;   /* last received print data from machine */
+    std::chrono::system_clock::time_point   last_utc_time;   /* last received print data from machine */
     std::chrono::system_clock::time_point   last_keep_alive;    /* last received print data from machine */
     std::chrono::system_clock::time_point   last_push_time;     /* last received print push from machine */
     std::chrono::system_clock::time_point   last_request_push;  /* last received print push from machine */
@@ -739,6 +747,7 @@ public:
     bool is_support_motor_noise_cali{false};
     bool is_support_wait_sending_finish{false};
     bool is_support_user_preset{false};
+    bool is_support_p1s_plus{false};
 
     int  nozzle_max_temperature = -1;
     int  bed_temperature_limit = -1;
@@ -871,8 +880,6 @@ public:
     // flow ratio calibration
     int command_start_flow_ratio_calibration(const X1CCalibInfos& calib_data);
     int command_get_flow_ratio_calibration_result(float nozzle_diameter);
-
-    int command_unload_filament();
 
     // camera control
     int command_ipcam_record(bool on_off);

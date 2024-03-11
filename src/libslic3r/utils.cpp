@@ -13,6 +13,7 @@
 #include <cstdarg>
 #include <stdio.h>
 
+#include "format.hpp"
 #include "Platform.hpp"
 #include "Time.hpp"
 #include "libslic3r.h"
@@ -265,6 +266,18 @@ const std::string& sys_shapes_dir()
 	return g_sys_shapes_dir;
 }
 
+static std::string g_custom_gcodes_dir;
+
+void set_custom_gcodes_dir(const std::string &dir)
+{
+    g_custom_gcodes_dir = dir;
+}
+
+const std::string& custom_gcodes_dir()
+{
+    return g_custom_gcodes_dir;
+}
+
 // Translate function callback, to call wxWidgets translate function to convert non-localized UTF8 string to a localized one.
 Slic3r::I18N::translate_fn_type Slic3r::I18N::translate_fn = nullptr;
 static std::string g_data_dir;
@@ -272,6 +285,9 @@ static std::string g_data_dir;
 void set_data_dir(const std::string &dir)
 {
     g_data_dir = dir;
+    if (!g_data_dir.empty() && !boost::filesystem::exists(g_data_dir)) {
+       boost::filesystem::create_directory(g_data_dir);
+    }
 }
 
 const std::string& data_dir()
@@ -1225,6 +1241,34 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
     return text;
 }
 
+// Definition of escape symbols https://www.w3.org/TR/REC-xml/#AVNormalize
+// During the read of xml attribute normalization of white spaces is applied
+// Soo for not lose white space character it is escaped before store
+std::string xml_escape_double_quotes_attribute_value(std::string text)
+{
+    std::string::size_type pos = 0;
+    for (;;) {
+        pos = text.find_first_of("\"&<\r\n\t", pos);
+        if (pos == std::string::npos) break;
+
+        std::string replacement;
+        switch (text[pos]) {
+        case '\"': replacement = "&quot;"; break;
+        case '&': replacement = "&amp;"; break;
+        case '<': replacement = "&lt;"; break;
+        case '\r': replacement = "&#xD;"; break;
+        case '\n': replacement = "&#xA;"; break;
+        case '\t': replacement = "&#x9;"; break;
+        default: break;
+        }
+
+        text.replace(pos, 1, replacement);
+        pos += replacement.size();
+    }
+
+    return text;
+}
+
 std::string xml_unescape(std::string s)
 {
 	std::string ret;
@@ -1465,9 +1509,9 @@ bool bbl_calc_md5(std::string &filename, std::string &md5_out)
 }
 
 // SoftFever: copy directory recursively
-void copy_directory_recursively(const boost::filesystem::path &source, const boost::filesystem::path &target)
+void copy_directory_recursively(const boost::filesystem::path &source, const boost::filesystem::path &target, std::function<bool(const std::string)> filter)
 {
-    BOOST_LOG_TRIVIAL(info) << format("copy_directory_recursively %1% -> %2%", source, target);
+    BOOST_LOG_TRIVIAL(info) << Slic3r::format("copy_directory_recursively %1% -> %2%", source, target);
     std::string error_message;
 
     if (boost::filesystem::exists(target))
@@ -1484,16 +1528,36 @@ void copy_directory_recursively(const boost::filesystem::path &source, const boo
             copy_directory_recursively(dir_entry, target_path);
         }
         else {
+			if(filter && filter(name))
+				continue;
             CopyFileResult cfr = copy_file(source_file, target_file, error_message, false);
             if (cfr != CopyFileResult::SUCCESS) {
                 BOOST_LOG_TRIVIAL(error) << "Copying failed(" << cfr << "): " << error_message;
-                throw Slic3r::CriticalException(format(
+                throw Slic3r::CriticalException(Slic3r::format(
                     ("Copying directory %1% to %2% failed: %3%"),
                     source, target, error_message));
             }
         }
     }
     return;
+}
+
+void save_string_file(const boost::filesystem::path& p, const std::string& str)
+{
+    boost::nowide::ofstream file;
+    file.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    file.open(p.generic_string(), std::ios_base::binary);
+    file.write(str.c_str(), str.size());
+}
+
+void load_string_file(const boost::filesystem::path& p, std::string& str)
+{
+    boost::nowide::ifstream file;
+    file.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    file.open(p.generic_string(), std::ios_base::binary);
+    std::size_t sz = static_cast<std::size_t>(boost::filesystem::file_size(p));
+    str.resize(sz, '\0');
+    file.read(&str[0], sz);
 }
 
 }; // namespace Slic3r

@@ -7,11 +7,13 @@
 #include "libslic3r/CutUtils.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "slic3r/GUI/Jobs/BoostThreadWorker.hpp"
+#include "slic3r/GUI/Jobs/PlaterWorker.hpp"
 
 
 namespace Slic3r {
 namespace GUI {
-std::shared_ptr<PrintJob> CalibUtils::print_job;
+std::unique_ptr<Worker> CalibUtils::print_worker;
 wxString wxstr_temp_dir = fs::path(fs::temp_directory_path() / "calib").wstring();
 static const std::string temp_dir = wxstr_temp_dir.utf8_string();
 static const std::string temp_gcode_path = temp_dir + "/temp.gcode";
@@ -537,7 +539,7 @@ void CalibUtils::calib_flowrate(int pass, const CalibInfo &calib_info, wxString 
         auto modifier = stof(obj_name);
         _obj->config.set_key_value("print_flow_ratio", new ConfigOptionFloat(1.0f + modifier / 100.f));
     }
-
+    print_config.set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
     print_config.set_key_value("layer_height", new ConfigOptionFloat(layer_height));
     print_config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(first_layer_height));
     print_config.set_key_value("reduce_crossing_wall", new ConfigOptionBool(true));
@@ -660,7 +662,7 @@ void CalibUtils::calib_temptue(const CalibInfo &calib_info, wxString &error_mess
     read_model_from_file(input_file, model);
 
     // cut upper
-    auto obj_bb      = model.objects[0]->bounding_box();
+    auto obj_bb      = model.objects[0]->bounding_box_exact();
     auto block_count = lround((350 - params.start) / 5 + 1);
     if (block_count > 0) {
         // add EPSILON offset to avoid cutting at the exact location where the flat surface is
@@ -671,7 +673,7 @@ void CalibUtils::calib_temptue(const CalibInfo &calib_info, wxString &error_mess
     }
 
     // cut bottom
-    obj_bb      = model.objects[0]->bounding_box();
+    obj_bb      = model.objects[0]->bounding_box_exact();
     block_count = lround((350 - params.end) / 5);
     if (block_count > 0) {
         auto new_height = block_count * 10.0 + EPSILON;
@@ -726,7 +728,7 @@ void CalibUtils::calib_max_vol_speed(const CalibInfo &calib_info, wxString &erro
     auto obj             = model.objects[0];
     auto         bed_shape = printer_config.option<ConfigOptionPoints>("printable_area")->values;
     BoundingBoxf bed_ext   = get_extents(bed_shape);
-    auto         scale_obj = (bed_ext.size().x() - 10) / obj->bounding_box().size().x();
+    auto         scale_obj = (bed_ext.size().x() - 10) / obj->bounding_box_exact().size().x();
     if (scale_obj < 1.0)
         obj->scale(scale_obj, 1, 1);
 
@@ -746,6 +748,7 @@ void CalibUtils::calib_max_vol_speed(const CalibInfo &calib_info, wxString &erro
     print_config.set_key_value("enable_overhang_speed", new ConfigOptionBool{false});
     print_config.set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
     print_config.set_key_value("wall_loops", new ConfigOptionInt(1));
+    print_config.set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
     print_config.set_key_value("top_shell_layers", new ConfigOptionInt(0));
     print_config.set_key_value("bottom_shell_layers", new ConfigOptionInt(1));
     print_config.set_key_value("sparse_infill_density", new ConfigOptionPercent(0));
@@ -759,7 +762,7 @@ void CalibUtils::calib_max_vol_speed(const CalibInfo &calib_info, wxString &erro
     obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
 
     //  cut upper
-    auto obj_bb = obj->bounding_box();
+    auto obj_bb = obj->bounding_box_exact();
     double height = (params.end - params.start + 1) / params.step;
     if (height < obj_bb.size().z()) {
         cut_model(model, height, ModelObjectCutAttribute::KeepLower);
@@ -805,6 +808,8 @@ void CalibUtils::calib_VFA(const CalibInfo &calib_info, wxString &error_message)
     print_config.set_key_value("enable_overhang_speed", new ConfigOptionBool{false});
     print_config.set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
     print_config.set_key_value("wall_loops", new ConfigOptionInt(1));
+    print_config.set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config.set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
     print_config.set_key_value("top_shell_layers", new ConfigOptionInt(0));
     print_config.set_key_value("bottom_shell_layers", new ConfigOptionInt(1));
     print_config.set_key_value("sparse_infill_density", new ConfigOptionPercent(0));
@@ -815,7 +820,7 @@ void CalibUtils::calib_VFA(const CalibInfo &calib_info, wxString &error_message)
     model.objects[0]->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
 
     // cut upper
-    auto obj_bb = model.objects[0]->bounding_box();
+    auto obj_bb = model.objects[0]->bounding_box_exact();
     auto height = 5 * ((params.end - params.start) / params.step + 1);
     if (height < obj_bb.size().z()) {
         cut_model(model, height, ModelObjectCutAttribute::KeepLower);
@@ -862,6 +867,7 @@ void CalibUtils::calib_retraction(const CalibInfo &calib_info, wxString &error_m
     filament_config.set_key_value("curr_bed_type", new ConfigOptionEnum<BedType>(calib_info.bed_type));
 
     obj->config.set_key_value("wall_loops", new ConfigOptionInt(2));
+    obj->config.set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
     obj->config.set_key_value("top_shell_layers", new ConfigOptionInt(0));
     obj->config.set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
     obj->config.set_key_value("sparse_infill_density", new ConfigOptionPercent(0));
@@ -869,7 +875,7 @@ void CalibUtils::calib_retraction(const CalibInfo &calib_info, wxString &error_m
     obj->config.set_key_value("layer_height", new ConfigOptionFloat(layer_height));
 
     //  cut upper
-    auto obj_bb = obj->bounding_box();
+    auto obj_bb = obj->bounding_box_exact();
     auto height = 1.0 + 0.4 + ((params.end - params.start)) / params.step;
     if (height < obj_bb.size().z()) {
         cut_model(model, height, ModelObjectCutAttribute::KeepLower);
@@ -924,7 +930,7 @@ void CalibUtils::process_and_store_3mf(Model *model, const DynamicPrintConfig &f
     if (params.mode == CalibMode::Calib_PA_Line) {
         double space_y       = 3.5;
         int    max_line_nums = int(plate_size[1] - 10) / space_y;
-        int    count         = std::llround(std::ceil((params.end - params.start) / params.step));
+        int    count         = std::llround(std::ceil((params.end - params.start) / params.step)) + 1;
         if (count > max_line_nums) {
             error_message = _L("Unable to calibrate: maybe because the set calibration value range is too large, or the step is too small");
             return;
@@ -941,7 +947,7 @@ void CalibUtils::process_and_store_3mf(Model *model, const DynamicPrintConfig &f
         ModelInstance *instance = model->objects[0]->instances[0];
         instance->set_offset(instance->get_offset() + Vec3d(current_width / 2, current_depth / 2, 0));
     } else {
-        BoundingBoxf3 bbox = model->bounding_box();
+        BoundingBoxf3 bbox = model->bounding_box_exact();
         Vec3d bbox_center = bbox.center();
         for (auto object : model->objects) {
             ModelInstance *instance = object->instances[0];
@@ -1134,7 +1140,9 @@ void CalibUtils::send_to_print(const CalibInfo &calib_info, wxString &error_mess
         }
     }
 
-    print_job                   = std::make_shared<PrintJob>(std::move(process_bar), wxGetApp().plater(), dev_id);
+    print_worker = std::make_unique<PlaterWorker<BoostThreadWorker>>(wxGetApp().plater(), std::move(process_bar), "calib_worker");
+
+    auto print_job              = std::make_unique<PrintJob>(dev_id);
     print_job->m_dev_ip         = obj_->dev_ip;
     print_job->m_ftp_folder     = obj_->get_ftp_folder();
     print_job->m_access_code    = obj_->get_access_code();
@@ -1187,7 +1195,7 @@ void CalibUtils::send_to_print(const CalibInfo &calib_info, wxString &error_mess
         BOOST_LOG_TRIVIAL(info) << "send_cali_job - after send: " << j.dump();
     }
 
-    print_job->start();
+    replace_job(*print_worker, std::move(print_job));
 }
 
 }

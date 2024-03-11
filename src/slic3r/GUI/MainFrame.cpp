@@ -1,3 +1,14 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Tomáš Mészáros @tamasmeszaros, Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Lukáš Hejl @hejllukas, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2021 Jason Scurtu @xarbit
+///|/ Copyright (c) 2019 John Drake @foxox
+///|/
+///|/ ported from lib/Slic3r/GUI/MainFrame.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2019 Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Enrico Turri @enricoturri1966
+///|/ Copyright (c) Slic3r 2014 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2014 Mark Hindess
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "MainFrame.hpp"
 
 #include <wx/panel.h>
@@ -16,6 +27,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Polygon.hpp"
@@ -385,29 +397,20 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     sizer->SetSizeHints(this);
 
 #ifdef WIN32
-    auto setMaxSize = [this]() {
-        wxDisplay display(this);
-        auto size = display.GetClientArea().GetSize();
-        HWND      hWnd = GetHandle();
-        RECT      borderThickness;
-        SetRectEmpty(&borderThickness);
-        AdjustWindowRectEx(&borderThickness, GetWindowLongPtr(hWnd, GWL_STYLE), FALSE, 0);
-        SetMaxSize(size + wxSize{-borderThickness.left + borderThickness.right, -borderThickness.top + borderThickness.bottom});
-    };
-    this->Bind(wxEVT_DPI_CHANGED, [setMaxSize](auto & e) {
-        setMaxSize();
-        e.Skip();
-        });
-    setMaxSize();
-    // SetMaximize already position window at left/top corner, even if Windows Task Bar is at left side.
-    // Not known why, but fix it here
+    // SetMaximize causes the window to overlap the taskbar, due to the fact this window has wxMAXIMIZE_BOX off
+    // https://forums.wxwidgets.org/viewtopic.php?t=50634
+    // Fix it here
     this->Bind(wxEVT_MAXIMIZE, [this](auto &e) {
         wxDisplay display(this);
-        auto pos = display.GetClientArea().GetPosition();
+        auto      size = display.GetClientArea().GetSize();
+        auto      pos  = display.GetClientArea().GetPosition();
         HWND      hWnd = GetHandle();
         RECT      borderThickness;
         SetRectEmpty(&borderThickness);
         AdjustWindowRectEx(&borderThickness, GetWindowLongPtr(hWnd, GWL_STYLE), FALSE, 0);
+        const auto max_size = size + wxSize{-borderThickness.left + borderThickness.right, -borderThickness.top + borderThickness.bottom};
+        const auto current_size = GetSize();
+        SetSize({std::min(max_size.x, current_size.x), std::min(max_size.y, current_size.y)});
         Move(pos + wxPoint{borderThickness.left, borderThickness.top});
         e.Skip();
     });
@@ -609,7 +612,40 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
 
     wxGetApp().persist_window_geometry(this, true);
     wxGetApp().persist_window_geometry(&m_settings_dialog, true);
+    // bind events from DiffDlg
+
+    bind_diff_dialog();
 }
+
+void MainFrame::bind_diff_dialog()
+{
+    auto get_tab = [](Preset::Type type) {
+        Tab* null_tab = nullptr;
+        for (Tab* tab : wxGetApp().tabs_list)
+            if (tab->type() == type)
+                return tab;
+        return null_tab;
+    };
+
+    auto transfer = [this, get_tab](Preset::Type type) {
+        get_tab(type)->transfer_options(diff_dialog.get_left_preset_name(type),
+                                        diff_dialog.get_right_preset_name(type),
+                                        diff_dialog.get_selected_options(type));
+    };
+
+    auto process_options = [this](std::function<void(Preset::Type)> process) {
+        const Preset::Type diff_dlg_type = diff_dialog.view_type();
+        if (diff_dlg_type == Preset::TYPE_INVALID) {
+            for (const Preset::Type& type : diff_dialog.types_list() )
+                process(type);
+        }
+        else
+            process(diff_dlg_type);
+    };
+
+    diff_dialog.Bind(EVT_DIFF_DIALOG_TRANSFER,      [process_options, transfer](SimpleEvent&)         { process_options(transfer); });
+}
+
 
 #ifdef __WIN32__
 
@@ -762,7 +798,7 @@ void MainFrame::update_layout()
         //BBS: add bed exclude area
         m_plater->set_bed_shape({ { 0.0, 0.0 }, { 200.0, 0.0 }, { 200.0, 200.0 }, { 0.0, 200.0 } }, {}, 0.0, {}, {}, true);
         m_plater->get_collapse_toolbar().set_enabled(false);
-        m_plater->collapse_sidebar(true);
+        m_plater->enable_sidebar(false);
         m_plater->Show();
         break;
     }
@@ -811,7 +847,7 @@ void MainFrame::shutdown()
 #endif // _WIN32
 
     if (m_plater != nullptr) {
-        m_plater->stop_jobs();
+        m_plater->get_ui_job_worker().cancel_all();
 
         // Unbinding of wxWidgets event handling in canvases needs to be done here because on MAC,
         // when closing the application using Command+Q, a mouse event is triggered after this lambda is completed,
@@ -2528,8 +2564,26 @@ void MainFrame::init_menubar_as_editor()
                 wxGetApp().toggle_show_gcode_window();
                 m_plater->get_current_canvas3D()->post_event(SimpleEvent(wxEVT_PAINT));
             },
-            this, [this]() { return m_plater->is_preview_shown(); },
+            this, [this]() { return m_tabpanel->GetSelection() == tpPreview; },
             [this]() { return wxGetApp().show_gcode_window(); }, this);
+
+        append_menu_check_item(
+            viewMenu, wxID_ANY, _L("Show 3D Navigator"), _L("Show 3D navigator in Prepare and Preview scene"),
+            [this](wxCommandEvent&) {
+                wxGetApp().toggle_show_3d_navigator();
+                m_plater->get_current_canvas3D()->post_event(SimpleEvent(wxEVT_PAINT));
+            },
+            this, [this]() { return m_tabpanel->GetSelection() == TabPosition::tp3DEditor || m_tabpanel->GetSelection() == TabPosition::tpPreview; },
+            [this]() { return wxGetApp().show_3d_navigator(); }, this);
+
+        append_menu_item(
+            viewMenu, wxID_ANY, _L("Reset Window Layout"), _L("Reset to default window layout"),
+            [this](wxCommandEvent&) { m_plater->reset_window_layout(); }, "", this,
+            [this]() {
+                return (m_tabpanel->GetSelection() == TabPosition::tp3DEditor || m_tabpanel->GetSelection() == TabPosition::tpPreview) &&
+                       m_plater->is_sidebar_enabled();
+            },
+            this);
 
         viewMenu->AppendSeparator();
         append_menu_check_item(viewMenu, wxID_ANY, _L("Show &Labels") + "\t" + ctrl + "E", _L("Show object labels in 3D scene"),
@@ -3073,7 +3127,7 @@ void MainFrame::load_config_file()
  //       return;
     wxFileDialog dlg(this, _L("Select profile to load:"),
         !m_last_config.IsEmpty() ? get_dir_name(m_last_config) : wxGetApp().app_config->get_last_dir(),
-        "config.json", "Config files (*.json;*.zip;*.bbscfg;*.bbsflmt)|*.json;*.zip;*.bbscfg;*.bbsflmt", wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
+        "config.json", "Config files (*.json;*.zip;*.orca_printer;*.orca_filament)|*.json;*.zip;*.orca_printer;*.orca_filament", wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
      wxArrayString files;
     if (dlg.ShowModal() != wxID_OK)
         return;
@@ -3102,8 +3156,11 @@ void MainFrame::load_config_file()
     }
     wxGetApp().preset_bundle->update_compatible(PresetSelectCompatibleType::Always);
     update_side_preset_ui();
-    MessageDialog dlg2(this, wxString::Format(_L_PLURAL("There is %d config imported. (Only non-system and compatible configs)",
-        "There are %d configs imported. (Only non-system and compatible configs)", cfiles.size()), cfiles.size()),
+    auto msg = wxString::Format(_L_PLURAL("There is %d config imported. (Only non-system and compatible configs)",
+        "There are %d configs imported. (Only non-system and compatible configs)", cfiles.size()), cfiles.size());
+    if(cfiles.empty())
+        msg += _L("\nHint: Make sure you have added the corresponding printer before importing the configs.");
+    MessageDialog dlg2(this,msg ,
                         _L("Import result"), wxOK);
     dlg2.ShowModal();
 }
@@ -3585,9 +3642,6 @@ void MainFrame::RunScript(wxString js)
 
 void MainFrame::technology_changed()
 {
-    // upadte DiffDlg
-    diff_dialog.update_presets();
-
     // update menu titles
     PrinterTechnology pt = plater()->printer_technology();
     if (int id = m_menubar->FindMenu(pt == ptFFF ? _omitL("Material Settings") : _L("Filament Settings")); id != wxNOT_FOUND)
@@ -3644,11 +3698,13 @@ void MainFrame::on_select_default_preset(SimpleEvent& evt)
         case wxID_YES: {
             wxGetApp().app_config->set_bool("sync_user_preset", true);
             wxGetApp().start_sync_user_preset(true);
+            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " sync_user_preset: true";
             break;
         }
         case wxID_NO:
             wxGetApp().app_config->set_bool("sync_user_preset", false);
             wxGetApp().stop_sync_user_preset();
+            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " sync_user_preset: false";
             break;
         default:
             break;
