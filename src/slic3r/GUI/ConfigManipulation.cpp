@@ -328,8 +328,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         is_msg_dlg_already_exist = false;
     }
 
-     // IG Customisation: Disable check for alternate extra walls
-    /*if (config->opt_bool("alternate_extra_wall") &&
+    if (config->opt_bool("alternate_extra_wall") &&
         (config->opt_enum<EnsureVerticalShellThickness>("ensure_vertical_shell_thickness") == evstAll)) {
         wxString msg_text = _(L("Alternate extra wall does't work well when ensure vertical shell thickness is set to All. "));
 
@@ -351,7 +350,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
         }
         apply(config, &new_conf);
-    }*/
+    }
 
     // BBS
     int filament_cnt = wxGetApp().preset_bundle->filament_presets.size();
