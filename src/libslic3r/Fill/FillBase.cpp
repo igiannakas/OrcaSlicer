@@ -137,19 +137,6 @@ void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& para
             polylines = this->fill_surface(surface, params);
     }
     catch (InfillFailedException&) {}
-    
-    /*if (params.use_arachne){
-        thick_polylines.erase(std::remove_if(thick_polylines.begin(), thick_polylines.end(),
-            [&](const ThickPolyline& p) {
-                return p.length() < scale_(5);
-            }), thick_polylines.end());
-    }else{
-        polylines.erase(std::remove_if(polylines.begin(), polylines.end(),
-            [&](const Polyline& p) {
-                return p.length() < scale_(5);
-            }), polylines.end());
-    }*/
-        
 
     if (!polylines.empty() || !thick_polylines.empty()) {
         // calculate actual flow from spacing (which might have been adjusted by the infill
