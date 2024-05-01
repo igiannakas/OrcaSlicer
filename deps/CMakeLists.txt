@@ -221,7 +221,6 @@ endif ()
 
 set(DEP_Boost_COMPONENTS system iostreams filesystem thread log locale regex date_time)
 include(Boost/Boost.cmake)
-include(Eigen/Eigen.cmake)
 
 # The order of includes respects the dependencies between libraries
 include(Cereal/Cereal.cmake)
@@ -259,7 +258,6 @@ include(FREETYPE/FREETYPE.cmake)
 
 set(_dep_list
     dep_Boost
-    dep_Eigen
     dep_TBB
     ${CURL_PKG}
     dep_wxWidgets
