@@ -793,9 +793,9 @@ WipeTower::ToolChangeResult WipeTower2::tool_change(size_t tool)
 	}
 
     WipeTower::box_coordinates cleaning_box(
-        Vec2f(m_perimeter_width, m_perimeter_width),
-        m_wipe_tower_width - 2 * m_perimeter_width,
-        (tool != (unsigned int)(-1) ? wipe_area+m_depth_traversed-m_perimeter_width
+		Vec2f(m_perimeter_width / 2.f, m_perimeter_width / 2.f),
+		m_wipe_tower_width - m_perimeter_width,
+        (tool != (unsigned int)(-1) ? wipe_area+m_depth_traversed-0.5f*m_perimeter_width
                                     : m_wipe_tower_depth-m_perimeter_width));
 
 	WipeTowerWriter2 writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
@@ -1086,7 +1086,7 @@ void WipeTower2::toolchange_Wipe(
 	float wipe_volume)
 {
 	// Increase flow on first layer, slow down print.
-    writer.set_extrusion_flow(m_extrusion_flow * (is_first_layer() ? 1.1f : 1.f))
+    writer.set_extrusion_flow(m_extrusion_flow * (is_first_layer() ? 1.18f : 1.f))
 		  .append("; CP TOOLCHANGE WIPE\n");
 	const float& xl = cleaning_box.ld.x();
 	const float& xr = cleaning_box.rd.x();
