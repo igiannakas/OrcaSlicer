@@ -1087,7 +1087,7 @@ void WipeTower2::toolchange_Wipe(
 	float wipe_volume)
 {
 	// Increase flow on first layer, slow down print.
-    writer.set_extrusion_flow(m_extrusicon_flow * (is_first_layer() ? m_wipe_tower_first_layer_flow_rate : 1.f))
+    writer.set_extrusion_flow(m_extrusion_flow * (is_first_layer() ? m_wipe_tower_first_layer_flow_rate : 1.f))
 		  .append("; CP TOOLCHANGE WIPE\n");
 	const float& xl = cleaning_box.ld.x();
 	const float& xr = cleaning_box.rd.x();
