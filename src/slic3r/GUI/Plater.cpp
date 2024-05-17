@@ -2706,7 +2706,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "brim_width", "wall_loops", "wall_filament", "sparse_infill_density", "sparse_infill_filament", "top_shell_layers",
         "enable_support", "support_filament", "support_interface_filament",
         "support_top_z_distance", "support_bottom_z_distance", "raft_layers",
-        "wipe_tower_rotation_angle", "wipe_tower_cone_angle", "wipe_tower_extra_spacing", "wipe_tower_extruder",
+        "wipe_tower_rotation_angle", "wipe_tower_cone_angle", "wipe_tower_extra_spacing","wipe_tower_max_purge_speed", "wipe_tower_extruder",
         "best_object_pos"
         }))
     , sidebar(new Sidebar(q))
@@ -7972,6 +7972,13 @@ bool Plater::priv::show_publish_dlg(bool show)
 //BBS: add bed exclude area
 void Plater::priv::set_bed_shape(const Pointfs& shape, const Pointfs& exclude_areas, const double printable_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom)
 {
+    //Orca: reduce resolution for large bed printer
+    BoundingBoxf bed_size = get_extents(shape);
+    if (bed_size.size().maxCoeff() <= LARGE_BED_THRESHOLD)
+        SCALING_FACTOR = SCALING_FACTOR_INTERNAL;
+    else
+        SCALING_FACTOR = SCALING_FACTOR_INTERNAL_LARGE_PRINTER;
+
     //BBS: add shape position
     Vec2d shape_position = partplate_list.get_current_shape_position();
     bool new_shape = bed.set_shape(shape, printable_height, custom_model, force_as_custom, shape_position);

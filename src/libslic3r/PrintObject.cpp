@@ -926,6 +926,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "initial_layer_line_width"
             || opt_key == "inner_wall_line_width"
             || opt_key == "infill_wall_overlap"
+            || opt_key == "top_bottom_infill_wall_overlap"
             || opt_key == "seam_gap"
             || opt_key == "role_based_wipe_speed"
             || opt_key == "wipe_on_loops"
@@ -3150,7 +3151,7 @@ void PrintObject::clip_fill_surfaces()
         }
         // Merge the new overhangs, find new internal infill.
         polygons_append(upper_internal, std::move(overhangs));
-        static constexpr const auto closing_radius = scaled<float>(2.f);
+        const auto closing_radius = scaled<float>(2.f);
         upper_internal = intersection(
             // Regularize the overhang regions, so that the infill areas will not become excessively jagged.
             smooth_outward(
