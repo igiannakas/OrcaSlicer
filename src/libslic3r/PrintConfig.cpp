@@ -4803,16 +4803,6 @@ def = this->add("filament_loading_speed", coFloats);
     def->mode = comAdvanced;
     def->min = 10;
     def->set_default_value(new ConfigOptionFloat(90.));
-    
-    def = this->add("wipe_tower_first_layer_flow_rate", coFloat);
-    def->label = L("Wipe tower first layer flow ratio");
-    def->tooltip = L("The flow rate to be used for the wipe tower's first layer. A larger flow rate ensures the wipe tower "
-                     "firmly adheres to the bed. However too large a flow rate may result in first layer over extrusion and nozzle scraping. "
-                     "A value of 1.0 means the filament flow rate will be used. A value of 1.1 means 10% higher flow rate will be used.");
-    def->sidetext = L("");
-    def->mode = comAdvanced;
-    def->min = 0.1;
-    def->set_default_value(new ConfigOptionFloat(1.18));
 
     def = this->add("wipe_tower_extruder", coInt);
     def->label = L("Wipe tower extruder");

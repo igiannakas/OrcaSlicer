@@ -1244,7 +1244,6 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              wipe_tower_cone_angle))
     ((ConfigOptionPercent,            wipe_tower_extra_spacing))
     ((ConfigOptionFloat,                wipe_tower_max_purge_speed))
-    ((ConfigOptionFloat,                wipe_tower_first_layer_flow_rate))
     ((ConfigOptionInt,                wipe_tower_extruder))
     ((ConfigOptionFloats,             wiping_volumes_extruders))
 

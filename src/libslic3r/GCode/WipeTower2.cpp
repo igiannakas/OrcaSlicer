@@ -551,7 +551,6 @@ WipeTower2::WipeTower2(const PrintConfig& config, const PrintRegionConfig& defau
     m_perimeter_speed(default_region_config.inner_wall_speed),
     m_current_tool(initial_tool),
     wipe_volumes(wiping_matrix),
-    m_wipe_tower_first_layer_flow_rate(float(config.wipe_tower_first_layer_flow_rate)),
     m_wipe_tower_max_purge_speed(float(config.wipe_tower_max_purge_speed))
 {
     // Read absolute value of first layer speed, if given as percentage,
@@ -1087,7 +1086,7 @@ void WipeTower2::toolchange_Wipe(
 	float wipe_volume)
 {
 	// Increase flow on first layer, slow down print.
-    writer.set_extrusion_flow(m_extrusicon_flow * (is_first_layer() ? m_wipe_tower_first_layer_flow_rate : 1.f))
+    writer.set_extrusion_flow(m_extrusion_flow * (is_first_layer() ? 1.18f : 1.f))
 		  .append("; CP TOOLCHANGE WIPE\n");
 	const float& xl = cleaning_box.ld.x();
 	const float& xr = cleaning_box.rd.x();
