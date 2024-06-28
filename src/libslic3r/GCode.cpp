@@ -4685,7 +4685,6 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, std::string description, dou
             // use extrude instead of travel_to_xy to trigger the unretract
             ExtrusionPath fake_path_wipe(Polyline{pt, current_point}, paths.front());
             fake_path_wipe.set_force_no_extrusion(true);
-            fake_path_wipe.mm3_per_mm = 0;
             gcode += extrude_path(fake_path_wipe, "move inwards before retraction/seam", speed);
         }
     }
@@ -4891,34 +4890,11 @@ std::string GCode::extrude_entity(const ExtrusionEntity &entity, std::string des
 
 std::string GCode::extrude_path(ExtrusionPath path, std::string description, double speed)
 {
-    //Orca: calculate path average mm3_per_mm value over the length of the path.
-    //This is used for adaptive PA
-    m_multi_flow_segment_path_pa_set = false; // always emit PA on the first path of the multi-path
+    // Orca: Reset average multipath flow
+    m_multi_flow_segment_path_pa_set = false;
     m_multi_flow_segment_path_average_mm3_per_mm = 0;
-    double weighted_sum_mm3_per_mm = 0.0;
-    double total_multipath_length = 0.0;
-    if(!path.is_force_no_extrusion()){
-        double path_length = unscale<double>(path.length()); //path length in mm
-        weighted_sum_mm3_per_mm += path.mm3_per_mm * path_length;
-        total_multipath_length += path_length;
-        // TODO: remove before adaptive PA release.
-        //gcode += "; APA: Loop len: " + std::to_string(path_length) + " Loop mm3_mm: " +std::to_string(path.mm3_per_mm) +"\n";
-    }
-    if (total_multipath_length != 0.0)
-        m_multi_flow_segment_path_average_mm3_per_mm = weighted_sum_mm3_per_mm / total_multipath_length;
-    else
-        printf("ZERO");
-    // Orca: end of multipath average mm3_per_mm value calculation
-    
-    
     //    description += ExtrusionEntity::role_to_string(path.role());
     std::string gcode = this->_extrude(path, description, speed);
-    
-    // Orca: Adaptive PA - dont adapt PA after the first extrusion is completed in the extrude_path move
-    // as we have already set the PA value to the average flow over the totality of the path
-    // in the first extrude move. In this specific case this is possibly redundant but retaining it
-    // to catch potential edge cases.
-    m_multi_flow_segment_path_pa_set = true;
     if (m_wipe.enable) {
         m_wipe.path = std::move(path.polyline);
         m_wipe.path.reverse();
@@ -5476,8 +5452,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
         // sprintf(buf, ";%sT%g MM3MM:%g %g %g\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::PA_Change).c_str(), m_writer.extruder()->id(), _mm3_per_mm, path.mm3_per_mm, e_per_mm / m_writer.extruder()->e_per_mm3());
         // gcode += buf;
         bool is_external = (path.role() == erExternalPerimeter);
-        // If the averaged flow for the extrusion path is not zero, issue the PA change command.
-        // The only scenario that this can be zero is on wipe before external perimeter
         if (m_multi_flow_segment_path_average_mm3_per_mm > 0) {
             // TODO: remove comment before release but retain tag below!
             //sprintf(buf, "; Multi segment path value used\n");
@@ -5490,8 +5464,14 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                     acceleration_i,
                     is_external,
                     role_change);
-        }else{
-            printf("Zero multiflow segment!\n");
+        } else {
+            sprintf(buf, ";%sT%u MM3MM:%g ACCEL:%u EXT:%d RC:%d\n",
+                    GCodeProcessor::reserved_tag(GCodeProcessor::ETags::PA_Change).c_str(),
+                    m_writer.extruder()->id(),
+                    _mm3_per_mm,
+                    acceleration_i,
+                    is_external,
+                    role_change);
         }
         gcode += buf;
     }
