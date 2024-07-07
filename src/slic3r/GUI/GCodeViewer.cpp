@@ -519,8 +519,8 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, f
             std::string  gline(m_file.data() + start, len);
 
             // If original line is longer than 55 characters, truncate and append "..."
-            if (original_len > 55)
-                gline = gline.substr(0, 52) + "...";
+            if (original_len > 70)
+                gline = gline.substr(0, 67) + "...";
 
             std::string command, parameters, comment;
             // extract comment
