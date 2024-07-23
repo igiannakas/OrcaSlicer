@@ -2510,6 +2510,7 @@ void PerimeterGenerator::process_arachne()
            wall_0_inset = -coord_t(ext_perimeter_width / 2 - ext_perimeter_spacing / 2);
 
         //PS
+        ExPolygons top_expolygons;
         // Calculate how many inner loops remain when TopSurfaces is selected.
         const int inner_loop_number = (config->only_one_wall_top && upper_slices != nullptr) ? loop_number - 1 : -1;
 
@@ -2536,7 +2537,7 @@ void PerimeterGenerator::process_arachne()
 
             // Get top ExPolygons from current infill contour.
             const Polygons upper_slices_clipped = ClipperUtils::clip_clipper_polygons_with_subject_bbox(*upper_slices, infill_contour_bbox);
-            ExPolygons     top_expolygons       = diff_ex(infill_contour, upper_slices_clipped);
+            top_expolygons = diff_ex(infill_contour, upper_slices_clipped);
             coord_t perimeter_width = this->perimeter_flow.scaled_width();
 
             if (!top_expolygons.empty()) {
@@ -2903,6 +2904,10 @@ void PerimeterGenerator::process_arachne()
             not_filled_exp,
             float(-min_perimeter_infill_spacing / 2.),
             float(inset + min_perimeter_infill_spacing / 2.));
+        // append infill areas to fill_surfaces
+        if (!top_expolygons.empty()) {
+            infill_exp = union_ex(infill_exp, offset_ex(top_expolygons, double(top_inset)));
+        }
         this->fill_surfaces->append(infill_exp, stInternal);
 
         apply_extra_perimeters(infill_exp);
@@ -2914,6 +2919,8 @@ void PerimeterGenerator::process_arachne()
                 not_filled_exp,
                 float(-min_perimeter_infill_spacing / 2.),
                 float(+min_perimeter_infill_spacing / 2.));
+            if (!top_expolygons.empty())
+                polyWithoutOverlap = union_ex(polyWithoutOverlap, top_expolygons);
             this->fill_no_overlap->insert(this->fill_no_overlap->end(), polyWithoutOverlap.begin(), polyWithoutOverlap.end());
         }
     }
