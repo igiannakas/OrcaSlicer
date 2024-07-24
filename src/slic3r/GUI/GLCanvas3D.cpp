@@ -7403,37 +7403,17 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
         return;
     }
 
-    float scale = wxGetApp().toolbar_icon_scale();
-    Size cnv_size = get_canvas_size();
-
-    //BBS: GUI refactor: GLToolbar
-    int size_i = int(GLToolbar::Default_Icons_Size * scale);
-    // force even size
-    if (size_i % 2 != 0)
-        size_i -= 1;
-    float size   = size_i;
-
-    // Set current size for all top toolbars. It will be used for next calculations
-#if ENABLE_RETINA_GL
-    const float sc = m_retina_helper->get_scale_factor() * scale;
-    //BBS: GUI refactor: GLToolbar
-    m_main_toolbar.set_scale(sc);
-    m_assemble_view_toolbar.set_scale(sc);
-    m_separator_toolbar.set_scale(sc);
-    collapse_toolbar.set_scale(sc / 2.0);
-    size *= m_retina_helper->get_scale_factor();
-
+    /* Soolbar scale is a constant value which depends on display resolution and OS. */
+    m_main_toolbar.set_scale(get_scale());
+    m_assemble_view_toolbar.set_scale(get_scale());
+    m_separator_toolbar.set_scale(get_scale());
+    collapse_toolbar.set_scale(get_scale());
     auto* m_notification = wxGetApp().plater()->get_notification_manager();
-    m_notification->set_scale(sc);
-    m_gizmos.set_overlay_scale(sc);
-#else
-    //BBS: GUI refactor: GLToolbar
-    m_main_toolbar.set_icons_size(size);
-    m_assemble_view_toolbar.set_icons_size(size);
-    m_separator_toolbar.set_icons_size(size);
-    collapse_toolbar.set_icons_size(size / 2.0);
-    m_gizmos.set_overlay_icon_size(size);
-#endif // ENABLE_RETINA_GL
+    m_notification->set_scale(get_scale());
+    m_gizmos.set_overlay_scale(get_scale());
+
+    float size = m_main_toolbar.get_icons_size();
+    Size cnv_size = get_canvas_size();
 
     //BBS: GUI refactor: GLToolbar
 #if BBS_TOOLBAR_ON_TOP
@@ -7445,6 +7425,7 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
 
     // calculate scale needed for items in all top toolbars
     float new_h_scale = (cnv_size.get_width() - noitems_width) / (items_cnt * GLToolbar::Default_Icons_Size);
+    new_h_scale = std::min(new_h_scale, 1.f);
 
     //for protect
     if (new_h_scale <= 0) {
@@ -7470,11 +7451,20 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
 
     // set minimum scale as a auto scale for the toolbars
     float new_scale = std::min(new_h_scale, new_v_scale);
-#if ENABLE_RETINA_GL
-    new_scale /= m_retina_helper->get_scale_factor();
-#endif
-    if (fabs(new_scale - scale) > 0.01) // scale is changed by 1% and more
-        wxGetApp().set_auto_toolbar_icon_scale(new_scale);
+
+    //BBS: GUI refactor: GLToolbar
+    int size_i = int(GLToolbar::Default_Icons_Size * new_scale);
+    // force even size
+    if (size_i % 2 != 0)
+        size_i -= 1;
+    size = size_i;
+
+    //BBS: GUI refactor: GLToolbar
+    m_main_toolbar.set_icons_size(size);
+    m_assemble_view_toolbar.set_icons_size(size);
+    m_separator_toolbar.set_icons_size(size);
+    collapse_toolbar.set_icons_size(size / 2.0);
+    m_gizmos.set_overlay_icon_size(size);
 }
 
 void GLCanvas3D::_render_overlays()
