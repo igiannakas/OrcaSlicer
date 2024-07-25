@@ -2811,7 +2811,7 @@ void PerimeterGenerator::process_arachne()
                 // ORCA: Expand the polygon with half the perimeter width in addition to the contracted amount,
                 // not the full perimeter width as PS does, to enable thin lettering to print on the top surface without nozzle collisions
                 // due to thin lines being generated
-                top_expolygons = offset2_ex(top_expolygons, -top_surface_min_width, top_surface_min_width + float(perimeter_width * 0.75));
+                top_expolygons = offset2_ex(top_expolygons, -top_surface_min_width, top_surface_min_width + float(perimeter_width * 0.85));
 
                 // Get the not-top ExPolygons (including bridges) from current slices and expanded real top ExPolygons (without bridges).
                 const ExPolygons not_top_expolygons = diff_ex(infill_contour, top_expolygons);
