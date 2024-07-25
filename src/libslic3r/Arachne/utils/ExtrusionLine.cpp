@@ -242,7 +242,7 @@ int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A,
 bool ExtrusionLine::is_contour() const
 {
     if (!this->is_closed)
-        return false;
+          return 0.;
 
     Polygon poly;
     poly.points.reserve(this->junctions.size());
@@ -267,6 +267,21 @@ double ExtrusionLine::area() const
     }
     return 0.5 * a;
 }
+
+Points to_points(const ExtrusionLine &extrusion_line) {
+     Points points;
+     points.reserve(extrusion_line.junctions.size());
+     for (const ExtrusionJunction &junction : extrusion_line.junctions)
+         points.emplace_back(junction.p);
+     return points;
+ }
+
+ BoundingBox get_extents(const ExtrusionLine &extrusion_line) {
+     BoundingBox bbox;
+     for (const ExtrusionJunction &junction : extrusion_line.junctions)
+         bbox.merge(junction.p);
+     return bbox;
+ }
 
 } // namespace Slic3r::Arachne
 
