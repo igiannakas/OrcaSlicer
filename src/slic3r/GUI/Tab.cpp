@@ -4239,7 +4239,6 @@ if (is_marlin_flavor)
         optgroup = page->new_optgroup(L("Wipe tower"), "param_tower");
         optgroup->append_single_option_line("purge_in_prime_tower", "semm");
         optgroup->append_single_option_line("enable_filament_ramming", "semm");
-        optgroup->append_single_option_line("flush_to_external_device", "semm");
 
 
         optgroup = page->new_optgroup(L("Single extruder multi-material parameters"), "param_settings");
@@ -4511,7 +4510,6 @@ void TabPrinter::toggle_options()
         // SoftFever: hide specific settings for BBL printer
         for (auto el : {
                  "enable_filament_ramming",
-                 "flush_to_external_device",
                  "cooling_tube_retraction",
                  "cooling_tube_length",
                  "parking_pos_retraction",

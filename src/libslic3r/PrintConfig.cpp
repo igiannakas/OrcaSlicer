@@ -4307,11 +4307,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
-    def = this->add("flush_to_external_device", coBool);
-    def->label = L("Enable flushing to external device");
-    def->tooltip = L("When this option is enabled, the printer assumes that flushing will be performed on an external device, like the blobifier. Therefore any G1 E(x) commands placed in the filament change gcode used for purge statistics are ignored.");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("wipe_tower_no_sparse_layers", coBool);
     def->label = L("No sparse layers (beta)");

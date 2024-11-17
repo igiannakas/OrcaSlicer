@@ -164,8 +164,6 @@ set(lisbslic3r_sources
     GCode/AdaptivePAInterpolator.hpp
     GCode/AdaptivePAProcessor.cpp
     GCode/AdaptivePAProcessor.hpp
-    GCode/FlushProcessor.cpp
-    GCode/FlushProcessor.hpp
     GCode/SpiralVase.cpp
     GCode/SpiralVase.hpp
     GCode/SeamPlacer.cpp

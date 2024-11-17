@@ -27,9 +27,6 @@
 // ORCA: post processor below used for Dynamic Pressure advance
 #include "GCode/AdaptivePAProcessor.hpp"
 
-// ORCA: post processor below used for filtering out flushing lines when purging to external device
-#include "GCode/FlushProcessor.hpp"
-
 #include <memory>
 #include <map>
 #include <set>
@@ -566,8 +563,6 @@ private:
     std::unique_ptr<PressureEqualizer>  m_pressure_equalizer;
     
     std::unique_ptr<AdaptivePAProcessor>      m_pa_processor;
-    
-    std::unique_ptr<FlushProcessor>         m_flush_processor;
 
     std::unique_ptr<WipeTowerIntegration> m_wipe_tower;
 
