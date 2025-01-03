@@ -32,7 +32,6 @@ struct Calib_Params
     double    start, end, step;
     bool      print_numbers;
 
-    bool      batch_mode;
     std::vector<double> accelerations;
     std::vector<double> speeds;
 
@@ -145,6 +144,7 @@ class CalibPressureAdvance
 {
 public:
     static float find_optimal_PA_speed(const DynamicPrintConfig &config, double line_width, double layer_height, int filament_idx = 0);
+    static float find_optimal_PA_flow(const DynamicPrintConfig &config, double line_width, double layer_height, int filament_idx = 0);
 
 protected:
     CalibPressureAdvance()  = default;
