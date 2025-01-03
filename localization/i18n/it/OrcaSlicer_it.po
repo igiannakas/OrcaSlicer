@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Orca Slicer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-09-11 22:56+0800\n"
+"POT-Creation-Date: 2024-12-01 08:07+0100\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -5915,6 +5915,9 @@ msgstr "Piastra corrente di blocco"
 msgid "Edit current plate name"
 msgstr "Modificare il nome del piatto corrente"
 
+msgid "Move plate to the front"
+msgstr ""
+
 msgid "Customize current plate"
 msgstr "Personalizza la piastra corrente"
 
@@ -6469,6 +6472,13 @@ msgstr "Reason: part \"%1%\" has self intersection."
 #, boost-format
 msgid "Reason: \"%1%\" and another part have no intersection."
 msgstr "Reason: \"%1%\" and another part have no intersection."
+
+msgid ""
+"Unable to perform boolean operation on model meshes. Only positive parts "
+"will be exported."
+msgstr ""
+"Impossibile eseguire operazioni booleane sulle mesh del modello. Verranno "
+"esportate solo le parti positive."
 
 msgid ""
 "Are you sure you want to store original SVGs with their local paths into the "
@@ -7877,6 +7887,14 @@ msgid ""
 msgstr ""
 "Temperatura del piano quando è installato il piatto Cool Plate. Il valore 0 "
 "significa che il filamento non supporta la stampa su piatto Cool Plate."
+
+msgid "Textured Cool plate"
+msgstr ""
+
+msgid ""
+"Bed temperature when cool plate is installed. Value 0 means the filament "
+"does not support to print on the Textured Cool Plate"
+msgstr ""
 
 msgid "Engineering plate"
 msgstr "Engineering plate"
@@ -9768,6 +9786,11 @@ msgstr "°C"
 
 msgid ""
 "Bed temperature for layers except the initial one. Value 0 means the "
+"filament does not support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature for layers except the initial one. Value 0 means the "
 "filament does not support to print on the Engineering Plate"
 msgstr ""
 "Indica la temperatura del piano dopo il primo layer. Il valore 0 significa "
@@ -9802,6 +9825,11 @@ msgstr ""
 
 msgid ""
 "Bed temperature of the initial layer. Value 0 means the filament does not "
+"support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature of the initial layer. Value 0 means the filament does not "
 "support to print on the Engineering Plate"
 msgstr ""
 "Indica la temperatura del piano del primo layer. Un valore pari a 0 indica "
@@ -9824,11 +9852,17 @@ msgstr ""
 msgid "Bed types supported by the printer"
 msgstr "Tipi di piatti supportati dalla stampante"
 
-msgid "Cool Plate"
-msgstr "Cool Plate"
+msgid "Smooth Cool Plate"
+msgstr ""
 
 msgid "Engineering Plate"
 msgstr "Engineering Plate"
+
+msgid "Smooth High Temp Plate"
+msgstr ""
+
+msgid "Textured Cool Plate"
+msgstr ""
 
 msgid "First layer print sequence"
 msgstr "Sequenza di stampa del primo strato"
@@ -10154,7 +10188,9 @@ msgstr "Soglia di inversione a sbalzo"
 msgid ""
 "Number of mm the overhang need to be for the reversal to be considered "
 "useful. Can be a % of the perimeter width.\n"
-"Value 0 enables reversal on every even layers regardless."
+"Value 0 enables reversal on every even layers regardless.\n"
+"When Detect overhang wall is not enabled, this option is ignored and "
+"reversal happens on every even layers regardless."
 msgstr ""
 
 msgid "Classic mode"
@@ -10864,7 +10900,7 @@ msgstr ""
 msgid "Enable adaptive pressure advance (beta)"
 msgstr ""
 
-#, c-format, boost-format
+#, no-c-format, no-boost-format
 msgid ""
 "With increasing print speeds (and hence increasing volumetric flow through "
 "the nozzle) and increasing accelerations, it has been observed that the "
@@ -10889,6 +10925,7 @@ msgstr ""
 msgid "Adaptive pressure advance measurements (beta)"
 msgstr ""
 
+#, no-c-format, no-boost-format
 msgid ""
 "Add sets of pressure advance (PA) values, the volumetric flow speeds and "
 "accelerations they were measured at, separated by a comma. One set of values "
@@ -12717,6 +12754,14 @@ msgstr "Ritrai al cambio layer"
 
 msgid "Force a retraction when changes layer"
 msgstr "Questo forza una retrazione nei cambi layer."
+
+msgid "Retract on top layer"
+msgstr ""
+
+msgid ""
+"Force a retraction on top layer. Disabling could prevent clog on very slow "
+"patterns with small movements, like Hilbert curve"
+msgstr ""
 
 msgid "Retraction Length"
 msgstr "Lunghezza Retrazione"
@@ -17149,6 +17194,9 @@ msgstr ""
 "aumentare in modo appropriato la temperatura del piano riscaldato può "
 "ridurre la probabilità di deformazione."
 
+#~ msgid "Cool Plate"
+#~ msgstr "Cool Plate"
+
 #~ msgid "Reverse on odd"
 #~ msgstr "Retromarcia su dispari"
 
@@ -17783,13 +17831,6 @@ msgstr ""
 
 #~ msgid "File not exists."
 #~ msgstr "Il file non esiste."
-
-#~ msgid ""
-#~ "Unable to perform boolean operation on model meshes. Only positive parts "
-#~ "will be exported."
-#~ msgstr ""
-#~ "Impossibile eseguire operazioni booleane sulle mesh del modello. Verranno "
-#~ "esportate solo le parti positive."
 
 #, boost-format
 #~ msgid ""

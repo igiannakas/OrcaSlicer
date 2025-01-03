@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-09-11 22:56+0800\n"
+"POT-Creation-Date: 2024-12-01 08:07+0100\n"
 "PO-Revision-Date: 2024-07-07 18:43+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -5927,6 +5927,9 @@ msgstr "Bloquejar la placa actual"
 msgid "Edit current plate name"
 msgstr "Editar el nom de la placa actual"
 
+msgid "Move plate to the front"
+msgstr ""
+
 msgid "Customize current plate"
 msgstr "Personalitzar la placa actual"
 
@@ -6475,6 +6478,11 @@ msgstr "Motiu: la part \"%1%\" té autointersecció."
 #, boost-format
 msgid "Reason: \"%1%\" and another part have no intersection."
 msgstr "Motiu: \"%1%\" i una altra peça no tenen intersecció."
+
+msgid ""
+"Unable to perform boolean operation on model meshes. Only positive parts "
+"will be exported."
+msgstr ""
 
 msgid ""
 "Are you sure you want to store original SVGs with their local paths into the "
@@ -7902,6 +7910,14 @@ msgid ""
 msgstr ""
 "Temperatura del llit quan s'instal·la la Base Freda. El valor 0 significa "
 "que el filament no admet imprimir a la Base Freda"
+
+msgid "Textured Cool plate"
+msgstr ""
+
+msgid ""
+"Bed temperature when cool plate is installed. Value 0 means the filament "
+"does not support to print on the Textured Cool Plate"
+msgstr ""
 
 msgid "Engineering plate"
 msgstr "Base d'enginyeria"
@@ -9795,6 +9811,11 @@ msgstr "°C"
 
 msgid ""
 "Bed temperature for layers except the initial one. Value 0 means the "
+"filament does not support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature for layers except the initial one. Value 0 means the "
 "filament does not support to print on the Engineering Plate"
 msgstr ""
 "Temperatura del llit de les capes excepte la inicial. El valor 0 significa "
@@ -9829,6 +9850,11 @@ msgstr ""
 
 msgid ""
 "Bed temperature of the initial layer. Value 0 means the filament does not "
+"support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature of the initial layer. Value 0 means the filament does not "
 "support to print on the Engineering Plate"
 msgstr ""
 "Temperatura del llit en la capa inicial. El valor 0 significa que el "
@@ -9851,11 +9877,17 @@ msgstr ""
 msgid "Bed types supported by the printer"
 msgstr "Tipus de llit suportats per la impressora"
 
-msgid "Cool Plate"
-msgstr "Base Freda"
+msgid "Smooth Cool Plate"
+msgstr ""
 
 msgid "Engineering Plate"
 msgstr "Base d'Enginyeria"
+
+msgid "Smooth High Temp Plate"
+msgstr ""
+
+msgid "Textured Cool Plate"
+msgstr ""
 
 msgid "First layer print sequence"
 msgstr "Seqüència d'impressió de primera capa"
@@ -10179,7 +10211,9 @@ msgstr "Llindar d'inversió en voladís"
 msgid ""
 "Number of mm the overhang need to be for the reversal to be considered "
 "useful. Can be a % of the perimeter width.\n"
-"Value 0 enables reversal on every even layers regardless."
+"Value 0 enables reversal on every even layers regardless.\n"
+"When Detect overhang wall is not enabled, this option is ignored and "
+"reversal happens on every even layers regardless."
 msgstr ""
 
 msgid "Classic mode"
@@ -10892,7 +10926,7 @@ msgstr "Avanç de Pressió Lineal( Klipper ) AKA Factor d'Avanç Lineal( Marlin 
 msgid "Enable adaptive pressure advance (beta)"
 msgstr ""
 
-#, c-format, boost-format
+#, no-c-format, no-boost-format
 msgid ""
 "With increasing print speeds (and hence increasing volumetric flow through "
 "the nozzle) and increasing accelerations, it has been observed that the "
@@ -10917,6 +10951,7 @@ msgstr ""
 msgid "Adaptive pressure advance measurements (beta)"
 msgstr ""
 
+#, no-c-format, no-boost-format
 msgid ""
 "Add sets of pressure advance (PA) values, the volumetric flow speeds and "
 "accelerations they were measured at, separated by a comma. One set of values "
@@ -12786,6 +12821,14 @@ msgstr "Retracció quan canvia de capa"
 
 msgid "Force a retraction when changes layer"
 msgstr "Forçar una retracció quan canvia de capa"
+
+msgid "Retract on top layer"
+msgstr ""
+
+msgid ""
+"Force a retraction on top layer. Disabling could prevent clog on very slow "
+"patterns with small movements, like Hilbert curve"
+msgstr ""
 
 msgid "Retraction Length"
 msgstr "Longitud de Retracció"
@@ -17293,6 +17336,9 @@ msgstr ""
 "Sabíeu que quan imprimiu materials propensos a deformar-se, com ara l'ABS, "
 "augmentar adequadament la temperatura del llit pot reduir la probabilitat de "
 "deformació."
+
+#~ msgid "Cool Plate"
+#~ msgstr "Base Freda"
 
 #~ msgid "Reverse on odd"
 #~ msgstr "Invertir en capes senars"

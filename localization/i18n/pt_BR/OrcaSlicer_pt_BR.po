@@ -2,7 +2,7 @@
 msgid ""
 msgstr ""
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-09-11 22:56+0800\n"
+"POT-Creation-Date: 2024-12-01 08:07+0100\n"
 "PO-Revision-Date: 2024-06-01 21:51-0300\n"
 "Last-Translator: \n"
 "Language-Team: Portuguese, Brazilian\n"
@@ -5911,6 +5911,9 @@ msgstr "Bloquear a mesa atual"
 msgid "Edit current plate name"
 msgstr "Editar nome da mesa atual"
 
+msgid "Move plate to the front"
+msgstr ""
+
 msgid "Customize current plate"
 msgstr "Personalizar a mesa atual"
 
@@ -6462,6 +6465,11 @@ msgstr "Motivo: parte \"%1%\" tem auto-intersecção."
 #, boost-format
 msgid "Reason: \"%1%\" and another part have no intersection."
 msgstr "Motivo: \"%1%\" e outra parte não tem intersecção."
+
+msgid ""
+"Unable to perform boolean operation on model meshes. Only positive parts "
+"will be exported."
+msgstr ""
 
 msgid ""
 "Are you sure you want to store original SVGs with their local paths into the "
@@ -7877,6 +7885,14 @@ msgid ""
 msgstr ""
 "Temperatura da mesa quando a cool plate (mesa fria) está instalada. Valor 0 "
 "significa que o filamento não suporta impressão na cool plate"
+
+msgid "Textured Cool plate"
+msgstr ""
+
+msgid ""
+"Bed temperature when cool plate is installed. Value 0 means the filament "
+"does not support to print on the Textured Cool Plate"
+msgstr ""
 
 msgid "Engineering plate"
 msgstr "Mesa de engenharia"
@@ -9741,6 +9757,11 @@ msgstr "°C"
 
 msgid ""
 "Bed temperature for layers except the initial one. Value 0 means the "
+"filament does not support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature for layers except the initial one. Value 0 means the "
 "filament does not support to print on the Engineering Plate"
 msgstr ""
 "Temperatura da mesa para camadas exceto a inicial. O valor 0 significa que o "
@@ -9775,6 +9796,11 @@ msgstr ""
 
 msgid ""
 "Bed temperature of the initial layer. Value 0 means the filament does not "
+"support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature of the initial layer. Value 0 means the filament does not "
 "support to print on the Engineering Plate"
 msgstr ""
 "Temperatura da mesa na primeira camada. O valor 0 significa que o filamento "
@@ -9797,11 +9823,17 @@ msgstr ""
 msgid "Bed types supported by the printer"
 msgstr "Tipos de mesa suportadas pela impressora"
 
-msgid "Cool Plate"
-msgstr "Mesa Fria"
+msgid "Smooth Cool Plate"
+msgstr ""
 
 msgid "Engineering Plate"
 msgstr "Engenharia Plate"
+
+msgid "Smooth High Temp Plate"
+msgstr ""
+
+msgid "Textured Cool Plate"
+msgstr ""
 
 msgid "First layer print sequence"
 msgstr "Sequência de impressão da primeira camada"
@@ -10123,7 +10155,9 @@ msgstr "Limiar de inversão de overhang"
 msgid ""
 "Number of mm the overhang need to be for the reversal to be considered "
 "useful. Can be a % of the perimeter width.\n"
-"Value 0 enables reversal on every even layers regardless."
+"Value 0 enables reversal on every even layers regardless.\n"
+"When Detect overhang wall is not enabled, this option is ignored and "
+"reversal happens on every even layers regardless."
 msgstr ""
 
 msgid "Classic mode"
@@ -10832,7 +10866,7 @@ msgstr ""
 msgid "Enable adaptive pressure advance (beta)"
 msgstr ""
 
-#, c-format, boost-format
+#, no-c-format, no-boost-format
 msgid ""
 "With increasing print speeds (and hence increasing volumetric flow through "
 "the nozzle) and increasing accelerations, it has been observed that the "
@@ -10857,6 +10891,7 @@ msgstr ""
 msgid "Adaptive pressure advance measurements (beta)"
 msgstr ""
 
+#, no-c-format, no-boost-format
 msgid ""
 "Add sets of pressure advance (PA) values, the volumetric flow speeds and "
 "accelerations they were measured at, separated by a comma. One set of values "
@@ -12693,6 +12728,14 @@ msgstr "Retrair ao mudar de camada"
 
 msgid "Force a retraction when changes layer"
 msgstr "Forçar uma retração ao mudar de camada"
+
+msgid "Retract on top layer"
+msgstr ""
+
+msgid ""
+"Force a retraction on top layer. Disabling could prevent clog on very slow "
+"patterns with small movements, like Hilbert curve"
+msgstr ""
 
 msgid "Retraction Length"
 msgstr "Distância de retração"
@@ -17116,6 +17159,9 @@ msgstr ""
 "Você sabia que ao imprimir materiais propensos ao empenamento, como ABS, "
 "aumentar adequadamente a temperatura da mesa aquecida pode reduzir a "
 "probabilidade de empenamento?"
+
+#~ msgid "Cool Plate"
+#~ msgstr "Mesa Fria"
 
 #~ msgid "Reverse on odd"
 #~ msgstr "Inverter em ímpares"

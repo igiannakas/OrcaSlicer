@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Orca Slicer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-09-11 22:56+0800\n"
+"POT-Creation-Date: 2024-12-01 08:07+0100\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -5755,6 +5755,9 @@ msgstr ""
 msgid "Edit current plate name"
 msgstr ""
 
+msgid "Move plate to the front"
+msgstr ""
+
 msgid "Customize current plate"
 msgstr ""
 
@@ -6288,6 +6291,13 @@ msgstr "Reason: part \"%1%\" has self intersection."
 #, boost-format
 msgid "Reason: \"%1%\" and another part have no intersection."
 msgstr "Reason: \"%1%\" and another part have no intersection."
+
+msgid ""
+"Unable to perform boolean operation on model meshes. Only positive parts "
+"will be exported."
+msgstr ""
+"Unable to perform boolean operation on model meshes. Only positive parts "
+"will be exported."
 
 msgid ""
 "Are you sure you want to store original SVGs with their local paths into the "
@@ -7651,6 +7661,14 @@ msgid ""
 msgstr ""
 "This is the bed temperature when the cool plate is installed. A value of 0 "
 "means the filament does not support printing on the Cool Plate."
+
+msgid "Textured Cool plate"
+msgstr ""
+
+msgid ""
+"Bed temperature when cool plate is installed. Value 0 means the filament "
+"does not support to print on the Textured Cool Plate"
+msgstr ""
 
 msgid "Engineering plate"
 msgstr "Engineering plate"
@@ -9431,6 +9449,11 @@ msgstr "°C"
 
 msgid ""
 "Bed temperature for layers except the initial one. Value 0 means the "
+"filament does not support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature for layers except the initial one. Value 0 means the "
 "filament does not support to print on the Engineering Plate"
 msgstr ""
 "This is the bed temperature for layers except for the first one. A value of "
@@ -9465,6 +9488,11 @@ msgstr ""
 
 msgid ""
 "Bed temperature of the initial layer. Value 0 means the filament does not "
+"support to print on the Textured Cool Plate"
+msgstr ""
+
+msgid ""
+"Bed temperature of the initial layer. Value 0 means the filament does not "
 "support to print on the Engineering Plate"
 msgstr ""
 "This is the bed temperature of the first layer. A value of 0 means the "
@@ -9487,11 +9515,17 @@ msgstr ""
 msgid "Bed types supported by the printer"
 msgstr "Bed types supported by the printer"
 
-msgid "Cool Plate"
-msgstr "Cool Plate"
+msgid "Smooth Cool Plate"
+msgstr ""
 
 msgid "Engineering Plate"
 msgstr "Engineering Plate"
+
+msgid "Smooth High Temp Plate"
+msgstr ""
+
+msgid "Textured Cool Plate"
+msgstr ""
 
 msgid "First layer print sequence"
 msgstr "First layer print sequence"
@@ -9787,7 +9821,9 @@ msgstr ""
 msgid ""
 "Number of mm the overhang need to be for the reversal to be considered "
 "useful. Can be a % of the perimeter width.\n"
-"Value 0 enables reversal on every even layers regardless."
+"Value 0 enables reversal on every even layers regardless.\n"
+"When Detect overhang wall is not enabled, this option is ignored and "
+"reversal happens on every even layers regardless."
 msgstr ""
 
 msgid "Classic mode"
@@ -10405,7 +10441,7 @@ msgstr ""
 msgid "Enable adaptive pressure advance (beta)"
 msgstr ""
 
-#, c-format, boost-format
+#, no-c-format, no-boost-format
 msgid ""
 "With increasing print speeds (and hence increasing volumetric flow through "
 "the nozzle) and increasing accelerations, it has been observed that the "
@@ -10430,6 +10466,7 @@ msgstr ""
 msgid "Adaptive pressure advance measurements (beta)"
 msgstr ""
 
+#, no-c-format, no-boost-format
 msgid ""
 "Add sets of pressure advance (PA) values, the volumetric flow speeds and "
 "accelerations they were measured at, separated by a comma. One set of values "
@@ -12033,6 +12070,14 @@ msgstr "Retract on layer change"
 
 msgid "Force a retraction when changes layer"
 msgstr "This forces a retraction on layer changes."
+
+msgid "Retract on top layer"
+msgstr ""
+
+msgid ""
+"Force a retraction on top layer. Disabling could prevent clog on very slow "
+"patterns with small movements, like Hilbert curve"
+msgstr ""
 
 msgid "Retraction Length"
 msgstr "Retraction Length"
@@ -16116,6 +16161,9 @@ msgstr ""
 "ABS, appropriately increasing the heatbed temperature can reduce the "
 "probability of warping?"
 
+#~ msgid "Cool Plate"
+#~ msgstr "Cool Plate"
+
 #~ msgid ""
 #~ "While printing by Object, the extruder may collide skirt.\n"
 #~ "Thus, reset the skirt layer to 1 to avoid that."
@@ -16389,13 +16437,6 @@ msgstr ""
 
 #~ msgid "Failed to parse model informations."
 #~ msgstr "Failed to parse model information"
-
-#~ msgid ""
-#~ "Unable to perform boolean operation on model meshes. Only positive parts "
-#~ "will be exported."
-#~ msgstr ""
-#~ "Unable to perform boolean operation on model meshes. Only positive parts "
-#~ "will be exported."
 
 #, boost-format
 #~ msgid ""
