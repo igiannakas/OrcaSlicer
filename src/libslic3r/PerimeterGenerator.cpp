@@ -1899,7 +1899,7 @@ void PerimeterGenerator::process_classic()
     coord_t ext_perimeter_spacing   = this->ext_perimeter_flow.scaled_spacing();
     coord_t ext_perimeter_spacing2;
     // Orca: ignore precise_outer_wall if wall_sequence is not InnerOuter
-    if(config->precise_outer_wall && this->config->wall_sequence == WallSequence::InnerOuter)
+    if(config->precise_outer_wall)
         ext_perimeter_spacing2 = scaled<coord_t>(0.5f * (this->ext_perimeter_flow.width() + this->perimeter_flow.width()));
     else
         ext_perimeter_spacing2 = scaled<coord_t>(0.5f * (this->ext_perimeter_flow.spacing() + this->perimeter_flow.spacing()));
@@ -2898,10 +2898,10 @@ void PerimeterGenerator::process_arachne()
         if (is_topmost_layer && loop_number > 0 && config->only_one_wall_top)
             loop_number = 0;
         
-        auto apply_precise_outer_wall = config->precise_outer_wall && this->config->wall_sequence == WallSequence::InnerOuter;
+        auto apply_precise_outer_wall = config->precise_outer_wall;
         // Orca: properly adjust offset for the outer wall if precise_outer_wall is enabled.
         ExPolygons last = offset_ex(surface.expolygon.simplify_p(surface_simplify_resolution),
-                       apply_precise_outer_wall? -float(ext_perimeter_width - ext_perimeter_spacing )
+                       apply_precise_outer_wall? -float(ext_perimeter_width - ext_perimeter_spacing )*3
                                                  : -float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
         
         Arachne::WallToolPathsParams input_params = Arachne::make_paths_params(this->layer_id, *object_config, *print_config);
@@ -2910,7 +2910,7 @@ void PerimeterGenerator::process_arachne()
 
         coord_t wall_0_inset = 0;
         if (apply_precise_outer_wall)
-           wall_0_inset = -coord_t(ext_perimeter_width / 2 - ext_perimeter_spacing / 2);
+           wall_0_inset = -coord_t(ext_perimeter_width / 2 - ext_perimeter_spacing / 2)*3;
 
         //PS: One wall top surface for Arachne
         ExPolygons top_expolygons;
@@ -2969,7 +2969,7 @@ void PerimeterGenerator::process_arachne()
                 // Get final top ExPolygons.
                 top_expolygons = intersection_ex(top_expolygons, infill_contour);
 
-                const Polygons not_top_polygons = to_polygons(not_top_expolygons);
+                Polygons not_top_polygons = to_polygons(offset_ex(not_top_expolygons,wall_0_inset));
                 Arachne::WallToolPaths inner_wall_tool_paths(not_top_polygons, perimeter_spacing, perimeter_spacing, coord_t(inner_loop_number + 1), 0, layer_height, input_params_tmp);
                 std::vector<Arachne::VariableWidthLines> inner_perimeters = inner_wall_tool_paths.getToolPaths();
 

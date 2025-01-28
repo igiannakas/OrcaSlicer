@@ -125,7 +125,7 @@ std::vector<float> LayerTimeSmoothingProcessor::calculateLayerTimeFactors(const 
                 }
             }
         }
-        // If tCurr is more than 25% bigger than tNext, raise tNext
+        // If tCurr is more than X% bigger than tNext, raise tNext
         else if (tCurr > tNext * MAX_RATIO)
         {
             // tCurr is too large relative to tNext,
@@ -245,7 +245,7 @@ std::string LayerTimeSmoothingProcessor::process_layers(const std::vector<std::s
         std::istringstream layerStream(collected_layers[layerIndex]);
         std::string line;
         
-        bool external_perimeter = false;
+        bool skip_slowdown = false;
         
         while (std::getline(layerStream, line))
         {
@@ -262,12 +262,12 @@ std::string LayerTimeSmoothingProcessor::process_layers(const std::vector<std::s
                 }
             }
             
-            // Detect outer wall
+            // Detect walls
             if (tokens.size() >= 1) {
-                if (tokens[0].rfind(";TYPE:Outer", 0) == 0) { // Outer wall
-                    external_perimeter = true;
+                if (tokens[0].rfind(";TYPE:Outer", 0) == 0) || tokens[0].rfind(";TYPE:Inner", 0) == 0) { // Dont process walls
+                    skip_slowdown = true;
                 } else if (tokens[0].rfind(";TYPE:", 0) == 0) { // any other feature
-                    external_perimeter = false;
+                    skip_slowdown = false;
                 }
             }
             
@@ -275,7 +275,7 @@ std::string LayerTimeSmoothingProcessor::process_layers(const std::vector<std::s
             if (tokens.size() == 2)
             {
                 // tokens[0] == "G1" && tokens[1] == "FNNNN"
-                if (tokens[0] == "G1" && !external_perimeter) // dont amend the print speed if its an outer wall.
+                if (tokens[0] == "G1" && !skip_slowdown)
                 {
                     bool feedrateAdjusted = scaleFeedrate(tokens[1], factor);
                     if (feedrateAdjusted)

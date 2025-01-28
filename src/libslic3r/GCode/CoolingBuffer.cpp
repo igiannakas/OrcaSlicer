@@ -478,12 +478,14 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0 || line.feedrate > 0.f);
                 if (line.length > 0){
                     // Orca: Replace linear time calculation with move time computed from trapezoid calculation for improved accuracy
-                    //line.time = line.length / line.feedrate;
-                    line.time = compute_move_time_trapezoid(
-                        line.length,
-                        line.feedrate,
-                        m_current_acceleration
-                    );
+                    line.time = line.length / line.feedrate;
+                    
+                    // TODO: Orca LTS: allow user to enable basic trapezoid calculation to calculate slightly more accurate layer time
+                    //line.time = compute_move_time_trapezoid(
+                    //    line.length,
+                    //    line.feedrate,
+                    //    m_current_acceleration
+                    //);
                 }
                 line.time_max = line.time;
                 if ((line.type & CoolingLine::TYPE_ADJUSTABLE) || active_speed_modifier != size_t(-1))
