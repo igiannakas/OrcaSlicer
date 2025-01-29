@@ -2874,6 +2874,38 @@ void PerimeterGenerator::process_arachne()
     }
 
     Surfaces all_surfaces = this->slices->surfaces;
+    
+    
+    // 0) Retrieve the surfaces for the current layer.
+
+    // e.g. from "this->slices"
+
+    // 1) Convert current layer surfaces into ExPolygons and union them.
+    //    This is your entire cross-section for this layer.
+    ExPolygons current_layer_union;
+    {
+        // Collect all ex-polygons
+        std::vector<ExPolygon> layer_exps;
+        layer_exps.reserve(all_surfaces.size());
+        for (const Surface &s : all_surfaces)
+            layer_exps.push_back(s.expolygon);
+
+        // Now union them into one or more ExPolygons
+        current_layer_union = union_ex(layer_exps);
+    }
+
+    // 2) Convert upper layer slices (if present) into an ExPolygon union.
+    ExPolygons upper_layer_union;
+    if (this->upper_slices != nullptr && !this->upper_slices->empty()) {
+        // Since this->upper_slices is a pointer to std::vector<ExPolygon>,
+        // we can pass *this->upper_slices to union_ex(...).
+        upper_layer_union = union_ex(*this->upper_slices);
+    }
+
+    // 3) Compute the uncovered area in the current layer.
+    ExPolygons uncovered = diff_ex(current_layer_union, upper_layer_union);
+    bool shrink_layer = !uncovered.empty();
+    
 
     process_no_bridge(all_surfaces, perimeter_spacing, ext_perimeter_width);
     // BBS: don't simplify too much which influence arc fitting when export gcode if arc_fitting is enabled
@@ -2898,11 +2930,28 @@ void PerimeterGenerator::process_arachne()
         if (is_topmost_layer && loop_number > 0 && config->only_one_wall_top)
             loop_number = 0;
         
-        auto apply_precise_outer_wall = config->precise_outer_wall && this->config->wall_sequence == WallSequence::InnerOuter;
-        // Orca: properly adjust offset for the outer wall if precise_outer_wall is enabled.
-        ExPolygons last = offset_ex(surface.expolygon.simplify_p(surface_simplify_resolution),
-                       apply_precise_outer_wall? -float(ext_perimeter_width - ext_perimeter_spacing )
-                                                 : -float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
+        auto apply_precise_outer_wall = config->precise_outer_wall;
+        coord_t offset_value = 0;
+            
+            if (apply_precise_outer_wall) {
+                offset_value = -coord_t(ext_perimeter_width - ext_perimeter_spacing);
+            } else {
+                offset_value = -coord_t(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.);
+            }
+
+            // If `uncovered` is not empty, it means part of this layer is top => we shrink.
+            if (shrink_layer) {
+                coord_t shrink_amount = scale_(1.2);  // 1.2 mm, for example
+                offset_value -= shrink_amount;
+            }
+
+            // Now apply the combined offset.
+            ExPolygons last = offset_ex(
+                surface.expolygon.simplify_p(surface_simplify_resolution),
+                offset_value
+            );
+        
+        
         
         Arachne::WallToolPathsParams input_params = Arachne::make_paths_params(this->layer_id, *object_config, *print_config);
         // Set params is_top_or_bottom_layer for adjusting short-wall removal sensitivity.
