@@ -1568,7 +1568,7 @@ void PrintObject::discover_vertical_shells()
     bool top_bottom_surfaces_all_regions = this->num_printing_regions() > 1 && ! m_config.interface_shells.value;
 //    static constexpr const float top_bottom_expansion_coeff = 1.05f;
     // Just a tiny fraction of an infill extrusion width to merge neighbor regions reliably.
-    static constexpr const float top_bottom_expansion_coeff = 0.05f;
+    static constexpr const float top_bottom_expansion_coeff = -15.0f;
     if (top_bottom_surfaces_all_regions) {
         // This is a multi-material print and interface_shells are disabled, meaning that the vertical shell thickness
         // is calculated over all materials.
