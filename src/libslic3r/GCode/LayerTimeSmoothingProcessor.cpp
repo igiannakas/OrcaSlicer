@@ -237,6 +237,8 @@ std::string LayerTimeSmoothingProcessor::process_layers(const std::vector<std::s
         float factor = 1.0f;
         if (layerIndex < factors.size()) {
             factor = factors[layerIndex];
+            // TODO: Fudge factor to artificially inflate slowdowns
+            if(factor<1) factor = factor * 0.3;
         }
         
         // Parse the G-code lines from the layer’s combined string.
@@ -245,7 +247,7 @@ std::string LayerTimeSmoothingProcessor::process_layers(const std::vector<std::s
         std::istringstream layerStream(collected_layers[layerIndex]);
         std::string line;
         
-        bool skip_slowdown = false;
+        bool skip_slowdown = true;
         
         while (std::getline(layerStream, line))
         {
@@ -263,19 +265,32 @@ std::string LayerTimeSmoothingProcessor::process_layers(const std::vector<std::s
             }
             
             // Detect walls
+            //if (tokens.size() >= 1) {
+            //    if (tokens[0].rfind(";TYPE:Outer", 0) == 0 || tokens[0].rfind(";TYPE:Inner", 0) == 0) { // Dont process walls
+            //        skip_slowdown = true;
+            //    } else if (tokens[0].rfind(";TYPE:", 0) == 0) { // any other feature is upcomming, reset skip flag
+            //        skip_slowdown = false;
+            //    }
+            //}
+            
             if (tokens.size() >= 1) {
-                if (tokens[0].rfind(";TYPE:Outer", 0) == 0) || tokens[0].rfind(";TYPE:Inner", 0) == 0) { // Dont process walls
-                    skip_slowdown = true;
-                } else if (tokens[0].rfind(";TYPE:", 0) == 0) { // any other feature
+                if (tokens[0].rfind(";TYPE:Sparse", 0) == 0) { // Only slow down sparse infill
                     skip_slowdown = false;
+                } else if (tokens[0].rfind(";TYPE:", 0) == 0) { // any other feature is upcomming, skip slowdown
+                    skip_slowdown = true;
                 }
+            }
+            
+            if (skip_slowdown) { // skipping slowdown, output unmodified gcode line
+                result += line + '\n';
+                continue;
             }
             
             // Case 1: G1 F<number> (2 tokens)
             if (tokens.size() == 2)
             {
                 // tokens[0] == "G1" && tokens[1] == "FNNNN"
-                if (tokens[0] == "G1" && !skip_slowdown)
+                if (tokens[0] == "G1")// && !skip_slowdown)
                 {
                     bool feedrateAdjusted = scaleFeedrate(tokens[1], factor);
                     if (feedrateAdjusted)
