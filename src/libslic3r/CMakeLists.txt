@@ -419,7 +419,6 @@ set(lisbslic3r_sources
     Arachne/BeadingStrategy/WideningBeadingStrategy.hpp
     Arachne/BeadingStrategy/WideningBeadingStrategy.cpp
     Arachne/utils/ExtrusionJunction.hpp
-    Arachne/utils/ExtrusionJunction.cpp
     Arachne/utils/ExtrusionLine.hpp
     Arachne/utils/ExtrusionLine.cpp
     Arachne/utils/HalfEdge.hpp
@@ -551,7 +550,7 @@ set(OCCT_LIBS
     TKernel
 )
 
-
+find_package(libnoise REQUIRED)
 target_link_libraries(libslic3r
     libnest2d
     admesh
@@ -577,6 +576,7 @@ target_link_libraries(libslic3r
     JPEG::JPEG
     qoi
     opencv_world
+    noise::noise
     )
 
 if(NOT WIN32)
