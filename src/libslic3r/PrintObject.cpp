@@ -1477,7 +1477,7 @@ void PrintObject::detect_surfaces_type()
                     // This filters out bridges that are too narrow (less than 2 external perimeters and number_of_internal_walls internal perimeter wide as each bridge is a rectangle with 2x
                     // external perimeters)
                     LayerRegion *layerm = m_layers[i]->m_regions[region_id];
-                    int number_of_internal_walls = std::max(0, layerm->m_region->m_config.wall_loops - 1); // number of internal walls, clamped to a minimum of 0 as a safety precaution
+                    int number_of_internal_walls = std::max(0, layerm->m_region->config().wall_loops - 1); // number of internal walls, clamped to a minimum of 0 as a safety precaution
                     float        offset_distance = layerm->flow(frExternalPerimeter).scaled_width() + ((layerm->flow(frPerimeter).scaled_width()/2) * number_of_internal_walls);
                     
                     // Convert to ExPolygons once for offsetting
