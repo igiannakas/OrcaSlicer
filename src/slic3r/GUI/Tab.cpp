@@ -2105,8 +2105,10 @@ void TabPrint::build()
         optgroup->append_single_option_line("bridge_flow");
 	    optgroup->append_single_option_line("internal_bridge_flow");
         optgroup->append_single_option_line("bridge_density");
+        optgroup->append_single_option_line("internal_bridge_density");
         optgroup->append_single_option_line("thick_bridges");
         optgroup->append_single_option_line("thick_internal_bridges");
+        optgroup->append_single_option_line("enable_extra_bridge_layer");
         optgroup->append_single_option_line("dont_filter_internal_bridges");
         optgroup->append_single_option_line("counterbore_hole_bridging","counterbore-hole-bridging");
     
@@ -2138,6 +2140,8 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Infill"), L"param_infill");
         optgroup->append_single_option_line("sparse_infill_density");
         optgroup->append_single_option_line("sparse_infill_pattern", "fill-patterns#infill types and their properties of sparse");
+        optgroup->append_single_option_line("lattice_angle_1");
+        optgroup->append_single_option_line("lattice_angle_2");
         optgroup->append_single_option_line("infill_anchor_max");
         optgroup->append_single_option_line("infill_anchor");
         optgroup->append_single_option_line("internal_solid_infill_pattern");
