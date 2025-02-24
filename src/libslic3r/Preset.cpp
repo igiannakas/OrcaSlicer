@@ -767,6 +767,8 @@ BedType Preset::get_default_bed_type(PresetBundle* preset_bundle)
         return BedType::btPC;
     } else if (model_id == "C11") {
         return BedType::btPEI;
+    }else if (model_id == "Elegoo-CC" || model_id == "Elegoo-C") {//set default bed type to PTE for Elegoo-CC
+        return BedType::btPTE;
     }
     return BedType::btPEI;
 }
@@ -2459,7 +2461,7 @@ const Preset *PresetCollection::get_preset_base(const Preset &child) const
     // Handle user preset
     if (child.inherits().empty())
         return &child; // this is user root
-    auto inherits = find_preset(child.inherits());
+    auto inherits = find_preset2(child.inherits(),true);
     return inherits ? get_preset_base(*inherits) : nullptr;
 }
 
