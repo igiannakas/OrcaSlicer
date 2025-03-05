@@ -5077,12 +5077,12 @@ msgstr "&Вид"
 msgid "&Help"
 msgstr "&Помощь"
 
-#, c-format, boost-format
-msgid "A file exists with the same name: %s, do you want to override it."
+#, fuzzy, c-format, boost-format
+msgid "A file exists with the same name: %s, do you want to overwrite it?"
 msgstr "Файл с именем %s уже существует. Перезаписать его?"
 
-#, c-format, boost-format
-msgid "A config exists with the same name: %s, do you want to override it."
+#, fuzzy, c-format, boost-format
+msgid "A config exists with the same name: %s, do you want to overwrite it?"
 msgstr "Профиль с именем %s уже существует. Перезаписать его?"
 
 msgid "Overwrite file"
@@ -15747,6 +15747,23 @@ msgstr ""
 
 msgid "Output directory"
 msgstr "Папку сохранения"
+
+msgid "Output directory for the exported files."
+msgstr ""
+
+msgid "Debug level"
+msgstr ""
+
+msgid ""
+"Sets debug logging level. 0:fatal, 1:error, 2:warning, 3:info, 4:debug, 5:"
+"trace\n"
+msgstr ""
+
+msgid "Enable timelapse for print"
+msgstr ""
+
+msgid "If enabled, this slicing will be considered using timelapse"
+msgstr ""
 
 msgid "Load custom gcode"
 msgstr "Загрузить пользовательский G-код"
