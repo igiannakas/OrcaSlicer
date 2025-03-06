@@ -9500,6 +9500,7 @@ void Plater::_calib_pa_pattern(const Calib_Params& params)
         accel = *std::max_element(accels.begin(), accels.end());
     }
     print_config.set_key_value( "outer_wall_acceleration", new ConfigOptionFloat(accel));
+    print_config.set_key_value( "print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
     
     //Orca: find jerk value to use in the test
     if(print_config.option<ConfigOptionFloat>("default_jerk")->value > 0){ // we have set a jerk value
@@ -14422,7 +14423,7 @@ void Plater::post_process_string_object_exception(StringObjectException &err)
                         break;
                     }
                 }
-                err.string = format(_L("Plate% d: %s is not suggested to be used to print filament %s(%s). If you still want to do this printing, please set this filament's bed temperature to non zero."),
+                err.string = format(_L("Plate %d: %s is not suggested to be used to print filament %s(%s). If you still want to do this printing, please set this filament's bed temperature to non-zero."),
                              err.params[0], err.params[1], err.params[2], filament_name);
                 err.string += "\n";
             }
