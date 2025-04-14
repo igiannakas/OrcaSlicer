@@ -835,7 +835,8 @@ static std::vector<Vec2d> get_path_of_change_filament(const Print& print)
         std::string gcode_out;
         std::string line;
         Vec2f pos = tcr.start_pos;
-        Vec2f transformed_pos = pos;
+        auto  trans_pos = [wt_rot = Eigen::Rotation2Df(angle), &translation](const Vec2f& p) -> Vec2f { return wt_rot * p + translation; };
+        Vec2f transformed_pos = trans_pos(pos);
         Vec2f old_pos(-1000.1f, -1000.1f);
 
         while (gcode_str) {
@@ -863,7 +864,7 @@ static std::vector<Vec2d> get_path_of_change_filament(const Print& print)
                         line_out << ch;
                 }
 
-                transformed_pos = Eigen::Rotation2Df(angle) * pos + translation;
+                transformed_pos = trans_pos(pos);
 
                 if (transformed_pos != old_pos || never_skip) {
                     line = line_out.str();
@@ -3514,6 +3515,7 @@ inline std::string get_instance_name(const PrintObject *object, const PrintInsta
 std::string GCode::generate_skirt(const Print &print,
         const ExtrusionEntityCollection &skirt,
         const Point& offset,
+        const float skirt_start_angle,
         const LayerTools &layer_tools,
         const Layer& layer,
         unsigned int extruder_id)
@@ -3538,13 +3540,11 @@ std::string GCode::generate_skirt(const Print &print,
         Flow layer_skirt_flow = print.skirt_flow().with_height(float(m_skirt_done.back() - (m_skirt_done.size() == 1 ? 0. : m_skirt_done[m_skirt_done.size() - 2])));
         double mm3_per_mm = layer_skirt_flow.mm3_per_mm();
         // Decide where to start looping:
-        // - If it’s the first layer or if we do NOT want a single-wall draft shield,
+        // - If it’s the first layer or if we do NOT want a single-wall skirt/draft shield,
         //   start from loops.first (all loops).
-        // - Otherwise, if single_loop_draft_shield == true and draft_shield == true (and not the first layer),
+        // - Otherwise, if single_loop_draft_shield == true (and not the first layer),
         //   start from loops.second - 1 (just one loop).
-        bool single_loop_draft_shield = print.m_config.single_loop_draft_shield &&
-                                    (print.m_config.draft_shield == dsEnabled);
-        const size_t start_idx = (first_layer || !single_loop_draft_shield)
+        const size_t start_idx = (first_layer || !print.m_config.single_loop_draft_shield)
                                  ? loops.first
                                  : (loops.second - 1);
 
@@ -3567,7 +3567,7 @@ std::string GCode::generate_skirt(const Print &print,
                 gcode += this->extrude_loop(loop, "skirt", m_config.support_speed.value);
 
             // If we only want a single wall on non-first layers, break now
-            if (!first_layer && single_loop_draft_shield) {
+            if (!first_layer && print.m_config.single_loop_draft_shield) {
                 break;
             }
         }
@@ -4157,7 +4157,8 @@ LayerResult GCode::process_layer(
             m_last_processor_extrusion_role = erWipeTower;
         
         if (print.config().skirt_type == stCombined && !print.skirt().empty())
-            gcode += generate_skirt(print, print.skirt(), Point(0,0), layer_tools, layer, extruder_id);
+            gcode += generate_skirt(print, print.skirt(), Point(0, 0), layer.object()->config().skirt_start_angle, layer_tools, layer,
+                                    extruder_id);
 
         auto objects_by_extruder_it = by_extruder.find(extruder_id);
         if (objects_by_extruder_it == by_extruder.end())
@@ -4217,7 +4218,7 @@ LayerResult GCode::process_layer(
                     m_skirt_done.erase(m_skirt_done.begin()+1,m_skirt_done.end());
 
                 const Point& offset = instance_to_print.print_object.instances()[instance_to_print.instance_id].shift;
-                gcode += generate_skirt(print, instance_to_print.print_object.object_skirt(), offset, layer_tools, layer, extruder_id);
+                gcode += generate_skirt(print, instance_to_print.print_object.object_skirt(), offset, instance_to_print.print_object.config().skirt_start_angle, layer_tools, layer, extruder_id);
             }
         }
 
@@ -4237,7 +4238,7 @@ LayerResult GCode::process_layer(
                     if (first_layer)
                         m_skirt_done.clear();
                     const Point& offset = instance_to_print.print_object.instances()[instance_to_print.instance_id].shift;
-                    gcode += generate_skirt(print, instance_to_print.print_object.object_skirt(), offset, layer_tools, layer, extruder_id);
+                    gcode += generate_skirt(print, instance_to_print.print_object.object_skirt(), offset, instance_to_print.print_object.config().skirt_start_angle, layer_tools, layer, extruder_id);
                     if (instances_to_print.size() > 1 && &instance_to_print != &*(instances_to_print.end() - 1))
                         m_skirt_done.pop_back();
                 }
@@ -5187,10 +5188,15 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
         return lerp(m_nominal_z - height, m_nominal_z, z_ratio);
     };
 
+    bool slope_need_z_travel = false;
+    if (sloped != nullptr && !sloped->is_flat()) {
+        auto target_z = get_sloped_z(sloped->slope_begin.z_ratio);
+        slope_need_z_travel = m_writer.will_move_z(target_z);
+    }
     // go to first point of extrusion path
     //BBS: path.first_point is 2D point. But in lazy raise case, lift z is done in travel_to function.
     //Add m_need_change_layer_lift_z when change_layer in case of no lift if m_last_pos is equal to path.first_point() by chance
-    if (!m_last_pos_defined || m_last_pos != path.first_point() || m_need_change_layer_lift_z || (sloped != nullptr && !sloped->is_flat())) {
+    if (!m_last_pos_defined || m_last_pos != path.first_point() || m_need_change_layer_lift_z || slope_need_z_travel) {
         gcode += this->travel_to(
             path.first_point(),
             path.role(),
