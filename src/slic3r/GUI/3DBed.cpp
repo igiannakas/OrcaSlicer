@@ -654,7 +654,7 @@ void Bed3D::update_bed_triangles()
     Vec2d point_shift(0, 0);
     std::vector<Vec2d> origin_bed_shape;
     for (size_t i = 0; i < m_bed_shape.size(); i++) {
-        origin_bed_shape.push_back(m_bed_shape[i] - point_shift);
+         origin_bed_shape.push_back(m_bed_shape[i]);
     }
     std::vector<Vec2d> new_bed_shape; // offset to correct origin
     for (auto point : origin_bed_shape) {
