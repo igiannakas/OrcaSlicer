@@ -347,7 +347,7 @@ public:
 
 		// Based on Text
         memDc.SetFont(m_constant_text.based_on_font);
-        auto bs_version = wxString::Format("Based on PrusaSlicer and BambuStudio").ToStdString();
+        auto bs_version = wxString::Format(_L("Based on PrusaSlicer and BambuStudio")).ToStdString();
         wxSize based_on_ext = memDc.GetTextExtent(bs_version);
         wxRect based_on_rect(
 			wxPoint(0, height - based_on_ext.GetHeight() * 2),
@@ -1575,30 +1575,30 @@ void GUI_App::init_networking_callbacks()
         //    GUI::wxGetApp().request_user_handle(online_login);
         //    });
 
-        m_agent->set_server_callback([this](std::string url, int status) {
-
-            CallAfter([this]() {
-                if (!m_server_error_dialog) {
-                    /*m_server_error_dialog->EndModal(wxCLOSE);
-                    m_server_error_dialog->Destroy();
-                    m_server_error_dialog = nullptr;*/
-                    m_server_error_dialog = new NetworkErrorDialog(mainframe);
-                }
-
-                if(plater()->get_select_machine_dialog() && plater()->get_select_machine_dialog()->IsShown()){
-                    return;
-                }
-
-                if (m_server_error_dialog->m_show_again) {
-                    return;
-                }
-
-                if (m_server_error_dialog->IsShown()) {
-                    return;
-                }
-
-                m_server_error_dialog->ShowModal();
-            });
+        m_agent->set_server_callback([](std::string url, int status) {
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format(": server_callback, url=%1%, status=%2%") % url % status;
+            //CallAfter([this]() {
+            //    if (!m_server_error_dialog) {
+            //        /*m_server_error_dialog->EndModal(wxCLOSE);
+            //        m_server_error_dialog->Destroy();
+            //        m_server_error_dialog = nullptr;*/
+            //        m_server_error_dialog = new NetworkErrorDialog(mainframe);
+            //    }
+            //
+            //    if(plater()->get_select_machine_dialog() && plater()->get_select_machine_dialog()->IsShown()){
+            //        return;
+            //    }
+            //
+            //    if (m_server_error_dialog->m_show_again) {
+            //        return;
+            //    }
+            //
+            //    if (m_server_error_dialog->IsShown()) {
+            //        return;
+            //    }
+            //
+            //    m_server_error_dialog->ShowModal();
+            //});
         });
 
 
@@ -2250,7 +2250,7 @@ bool GUI_App::on_init_inner()
     // Verify resources path
     const wxString resources_dir = from_u8(Slic3r::resources_dir());
     wxCHECK_MSG(wxDirExists(resources_dir), false,
-        wxString::Format("Resources path does not exist or is not a directory: %s", resources_dir));
+        wxString::Format(_L("Resources path does not exist or is not a directory: %s"), resources_dir));
 
 #ifdef __linux__
     if (! check_old_linux_datadir(GetAppName())) {
@@ -4789,6 +4789,7 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
         [this, progressFn, cancelFn, finishFn, t = std::weak_ptr<int>(m_user_sync_token)] {
             // get setting list, update setting list
             std::string version = preset_bundle->get_vendor_profile_version(PresetBundle::ORCA_DEFAULT_BUNDLE).to_string();
+            if(!m_agent) return;
             int ret = m_agent->get_setting_list2(version, [this](auto info) {
                 auto type = info[BBL_JSON_KEY_TYPE];
                 auto name = info[BBL_JSON_KEY_NAME];
@@ -5923,7 +5924,7 @@ void GUI_App::MacOpenURL(const wxString& url)
 {
     if (url.empty())
         return;
-    start_download(boost::nowide::narrow(url));
+    start_download(into_u8(url));
 }
 
 // wxWidgets override to get an event on open files.
@@ -6245,6 +6246,7 @@ wxString GUI_App::current_language_code_safe() const
 		{ "ru", 	"ru_RU", },
         { "tr", 	"tr_TR", },
         { "pt", 	"pt_BR", },
+        { "lt", 	"lt_LT", },
 	};
 	wxString language_code = this->current_language_code().BeforeFirst('_');
 	auto it = mapping.find(language_code);
@@ -6685,7 +6687,7 @@ void GUI_App::associate_url(std::wstring url_prefix)
     }
     key_full = key_string;
 #elif defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)
-    DesktopIntegrationDialog::perform_downloader_desktop_integration(boost::nowide::narrow(url_prefix));
+    DesktopIntegrationDialog::perform_downloader_desktop_integration(into_u8(url_prefix));
 #endif // WIN32
 }
 
