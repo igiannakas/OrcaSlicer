@@ -14,7 +14,7 @@ Join our Discord community here:<br>
  
  <h3>🚨🚨🚨Important Security Alert🚨🚨🚨</h3> 
 
-The only official platforms for OrcaSlicer are **our GitHub project page**, <a href="https://orcaslicer.com/">**orcaslicer.com**</a>, and the <a href="https://discord.gg/P4VE9UY9gJ">**official Discord channel**</a>.
+The only official platforms for OrcaSlicer are **our GitHub project page**, <a href="https://orcaslicer.com/">**orcaslicer.com**</a>, the <a href="https://discord.gg/P4VE9UY9gJ">**official Discord channel**</a>, and the <a href="https://twitter.com/real_OrcaSlicer">**official Twitter/X account**</a>.
 
 Please be aware that "**orcaslicer.net**", "**orcaslicer.co**" or "**orca-slicer.com**" are NOT an official website for OrcaSlicer and may be potentially malicious. These sites appear to use AI-generated content, lacking genuine context and seems to exist solely to profit from advertisements. Worse, it may redirect download links to harmful sources. For your safety, avoid downloading OrcaSlicer from this site as the links may be compromised. 
 
@@ -124,8 +124,8 @@ Explore the latest developments in Orca Slicer with our nightly builds. Feedback
                 - For most common errors, open `DockerRun.sh` and read the comments.  
     - Ubuntu 
       - Dependencies **Will be auto installed with the shell script**: `libmspack-dev libgstreamerd-3-dev libsecret-1-dev libwebkit2gtk-4.0-dev libosmesa6-dev libssl-dev libcurl4-openssl-dev eglexternalplatform-dev libudev-dev libdbus-1-dev extra-cmake-modules libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git texinfo`
-      - run 'sudo ./BuildLinux.sh -u'
-      - run './BuildLinux.sh -dsi'
+      - run `sudo ./BuildLinux.sh -u`
+      - run `./BuildLinux.sh -dsi`
 
 # Note: 
 If you're running Klipper, it's recommended to add the following configuration to your `printer.cfg` file.
