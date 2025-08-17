@@ -604,15 +604,6 @@ private:
 
     std::string _extrude(const ExtrusionPath &path, std::string description = "", double speed = -1);
     bool _needSAFC(const ExtrusionPath &path);
-    void set_accel_with_flavor(GCodeWriter &wr, std::string &gcode,
-                               unsigned accel_i, unsigned jerk_i);
-
-    void maybe_toggle_accel_for_next_vertex(bool next_is_fuzzy,
-                                            bool &fuzzy_accel_on,
-                                            unsigned normal_accel_i,
-                                            unsigned jerk_i,
-                                            std::string &gcode,
-                                            GCodeWriter &writer);
     void print_machine_envelope(GCodeOutputStream &file, Print &print);
     void _print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
     void _print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
