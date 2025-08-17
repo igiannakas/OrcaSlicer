@@ -7,7 +7,9 @@
 #include <cmath>
 #include <string>
 #include <sstream>
+#include <iostream>
 #include <unordered_map>
+#include <cstdint>   // Orca: Used for uint8_t (part of fuzzy skin flagging)
 
 #include <oneapi/tbb/scalable_allocator.h>
 
@@ -177,19 +179,23 @@ class Point : public Vec2crd
 {
 public:
     using coord_type = coord_t;
+    
+    // Orca: flag to identify point as a point modified by fuzzy skin. More flags can be set here in the
+    // future and used as a bitwise operation.
+    static constexpr uint8_t FLAG_FUZZY = 0x01;
 
-    Point() : Vec2crd(0, 0) {}
-    Point(int32_t x, int32_t y) : Vec2crd(coord_t(x), coord_t(y)) {}
-    Point(int64_t x, int64_t y) : Vec2crd(coord_t(x), coord_t(y)) {}
-    Point(int64_t x, int32_t y) : Vec2crd(coord_t(x), coord_t(y)) {}
-    Point(int32_t x, int64_t y) : Vec2crd(coord_t(x), coord_t(y)) {}
-    Point(double x, double y) : Vec2crd(coord_t(std::round(x)), coord_t(std::round(y))) {}
+    Point() : Vec2crd(0, 0), m_flags(0) {}
+    Point(int32_t x, int32_t y) : Vec2crd(coord_t(x), coord_t(y)), m_flags(0) {}
+    Point(int64_t x, int64_t y) : Vec2crd(coord_t(x), coord_t(y)), m_flags(0) {}
+    Point(int64_t x, int32_t y) : Vec2crd(coord_t(x), coord_t(y)), m_flags(0) {}
+    Point(int32_t x, int64_t y) : Vec2crd(coord_t(x), coord_t(y)), m_flags(0) {}
+    Point(double x, double y) : Vec2crd(coord_t(std::round(x)), coord_t(std::round(y))), m_flags(0) {}
     Point(const Point &rhs) { *this = rhs; }
-	explicit Point(const Vec2d& rhs) : Vec2crd(coord_t(std::round(rhs.x())), coord_t(std::round(rhs.y()))) {}
+	explicit Point(const Vec2d& rhs) : Vec2crd(coord_t(std::round(rhs.x())), coord_t(std::round(rhs.y()))), m_flags(0) {}
 	// This constructor allows you to construct Point from Eigen expressions
     // This constructor has to be implicit (non-explicit) to allow implicit conversion from Eigen expressions.
     template<typename OtherDerived>
-    Point(const Eigen::MatrixBase<OtherDerived> &other) : Vec2crd(other) {}
+    Point(const Eigen::MatrixBase<OtherDerived> &other) : Vec2crd(other), m_flags(0) {}
     static Point new_scale(coordf_t x, coordf_t y) { return Point(coord_t(scale_(x)), coord_t(scale_(y))); }
     template<typename OtherDerived>
     static Point new_scale(const Eigen::MatrixBase<OtherDerived> &v) { return Point(coord_t(scale_(v.x())), coord_t(scale_(v.y()))); }
@@ -201,12 +207,25 @@ public:
         this->Vec2crd::operator=(other);
         return *this;
     }
+    // Orca: Copy operator to carry over fuzzy skin flags
+    Point& operator=(const Point& rhs) {
+        if (this != &rhs) {
+            this->Vec2crd::operator=(rhs);
+            this->m_flags = rhs.m_flags;
+        }
+        return *this;
+    }
 
     Point& operator+=(const Point& rhs) { this->x() += rhs.x(); this->y() += rhs.y(); return *this; }
     Point& operator-=(const Point& rhs) { this->x() -= rhs.x(); this->y() -= rhs.y(); return *this; }
 	Point& operator*=(const double &rhs) { this->x() = coord_t(this->x() * rhs); this->y() = coord_t(this->y() * rhs); return *this; }
-    Point operator*(const double &rhs) { return Point(this->x() * rhs, this->y() * rhs); }
-    bool   both_comp(const Point &rhs, const std::string& op) { 
+    Point operator*(const double &rhs) {
+        Point res(*this);                    // copies coords + flags
+        res.x() = coord_t(res.x() * rhs);
+        res.y() = coord_t(res.y() * rhs);
+        return res;
+    }
+    bool   both_comp(const Point &rhs, const std::string& op) {
         if (op == ">")
             return this->x() > rhs.x() && this->y() > rhs.y();
         else if (op == "<")
@@ -234,7 +253,12 @@ public:
     Point  rotated(double angle) const { Point res(*this); res.rotate(angle); return res; }
     Point  rotated(double cos_a, double sin_a) const { Point res(*this); res.rotate(cos_a, sin_a); return res; }
     Point  rotated(double angle, const Point &center) const { Point res(*this); res.rotate(angle, center); return res; }
-    Point  rotate_90_degree_ccw() const { return Point(-this->y(), this->x()); }
+    Point rotate_90_degree_ccw() const {
+        Point res(*this);
+        res = Point(-res.y(), res.x());
+        res.set_flags(this->flags()); // preserve flags
+        return res;
+    }
     int    nearest_point_index(const Points &points) const;
     int    nearest_point_index(const PointConstPtrs &points) const;
     int    nearest_point_index(const PointPtrs &points) const;
@@ -246,6 +270,19 @@ public:
     Point  projection_onto(const Line &line) const;
 
     double distance_to(const Point &point) const { return (point - *this).cast<double>().norm(); }
+    
+    // Orca: Fuzzy skin flags API
+    uint8_t flags() const                 { return m_flags; }
+    bool    has_flag(uint8_t mask) const  { return (m_flags & mask) != 0; }
+    void    set_flag(uint8_t mask, bool on=true) { if (on) m_flags |= mask; else m_flags &= ~mask; }
+
+    // Orca: Fuzzy skin convenience methods
+    bool    is_fuzzy() const              { return has_flag(FLAG_FUZZY); }
+    void    set_fuzzy(bool on=true)       { set_flag(FLAG_FUZZY, on); if(is_fuzzy()) std::cout << "fuzy"<<std::endl; }
+    void    set_flags(uint8_t f)          { m_flags = f; }   // bulk replace
+
+private:
+    uint8_t m_flags; // Orca: Point flags (used only for fuzzy skin points identification for now)
 };
 
 inline bool operator<(const Point &l, const Point &r) 
@@ -255,7 +292,9 @@ inline bool operator<(const Point &l, const Point &r)
 
 inline Point operator* (const Point& l, const double& r)
 {
-    return { coord_t(l.x() * r), coord_t(l.y() * r) };
+    Point res(l);
+    res *= r;            // uses in-place operator*=, flags are preserved
+    return res;
 }
 
 inline std::ostream &operator<<(std::ostream &os, const Point &pt)
@@ -297,7 +336,9 @@ inline bool is_approx(const Vec3d &p1, const Vec3d &p2, double epsilon = EPSILON
 inline Point lerp(const Point &a, const Point &b, double t)
 {
     assert((t >= -EPSILON) && (t <= 1. + EPSILON));
-    return ((1. - t) * a.cast<double>() + t * b.cast<double>()).cast<coord_t>();
+    Point out = ((1. - t) * a.cast<double>() + t * b.cast<double>()).template cast<coord_t>();
+    out.set_flags(uint8_t(a.flags() | b.flags()));   // merge flags
+    return out;
 }
 
 // if IncludeBoundary, then a bounding box is defined even for a single point.
@@ -587,12 +628,22 @@ inline coord_t align_to_grid(const coord_t coord, const coord_t spacing) {
     assert(aligned <= coord);
     return aligned;
 }
-inline Point   align_to_grid(Point   coord, Point   spacing) 
-    { return Point(align_to_grid(coord.x(), spacing.x()), align_to_grid(coord.y(), spacing.y())); }
-inline coord_t align_to_grid(coord_t coord, coord_t spacing, coord_t base) 
+inline Point align_to_grid(Point coord, Point spacing)
+{
+    Point out(align_to_grid(coord.x(), spacing.x()),
+              align_to_grid(coord.y(), spacing.y()));
+    out.set_flags(coord.flags()); // preserve flags
+    return out;
+}
+inline coord_t align_to_grid(coord_t coord, coord_t spacing, coord_t base)
     { return base + align_to_grid(coord - base, spacing); }
-inline Point   align_to_grid(Point   coord, Point   spacing, Point   base)
-    { return Point(align_to_grid(coord.x(), spacing.x(), base.x()), align_to_grid(coord.y(), spacing.y(), base.y())); }
+inline Point align_to_grid(Point coord, Point spacing, Point base)
+{
+    Point out(align_to_grid(coord.x(), spacing.x(), base.x()),
+              align_to_grid(coord.y(), spacing.y(), base.y()));
+    out.set_flags(coord.flags()); // preserve flags
+    return out;
+}
 
 // MinMaxLimits
 template<typename T> struct MinMax { T min; T max;};
