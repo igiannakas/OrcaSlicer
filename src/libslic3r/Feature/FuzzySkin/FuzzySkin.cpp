@@ -93,20 +93,29 @@ void fuzzy_polyline(Points& poly, bool closed, coordf_t slice_z, const FuzzySkin
         {
             Point pa = *p0 + (p0p1 * (p0pa_dist / p0p1_size)).cast<coord_t>();
             double r = noise->GetValue(unscale_(pa.x()), unscale_(pa.y()), slice_z) * cfg.thickness;
-            out.emplace_back(pa + (perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+            Point fuzz = pa + (perp(p0p1).cast<double>().normalized() * r).cast<coord_t>();
+            fuzz.set_fuzzy(true); // Orca: Tag fuzzy point for later gcode output manipulation
+            out.emplace_back(std::move(fuzz));
         }
         dist_left_over = p0pa_dist - p0p1_size;
         p0 = &p1;
     }
     while (out.size() < 3) {
         size_t point_idx = poly.size() - 2;
-        out.emplace_back(poly[point_idx]);
+        Point  q = poly[point_idx];
+        q.set_fuzzy(true); // Orca: Tag fuzzy point for later gcode output manipulation
+        out.emplace_back(std::move(q));
         if (point_idx == 0)
             break;
         -- point_idx;
     }
     if (out.size() >= 3)
         poly = std::move(out);
+
+    size_t cnt = 0;
+    for (const auto &p : out) if (p.is_fuzzy()) ++cnt;
+    fprintf(stdout, "[FUZZY] fuzzy_polyline: flagged=%zu total=%zu\n",
+            cnt, out.size());
 }
 
 // Thanks Cura developers for this function.
@@ -135,17 +144,23 @@ void fuzzy_extrusion_line(Arachne::ExtrusionJunctions& ext_lines, coordf_t slice
         for (; p0pa_dist < p0p1_size; p0pa_dist += min_dist_between_points + random_value() * range_random_point_dist) {
             Point pa = p0->p + (p0p1 * (p0pa_dist / p0p1_size)).cast<coord_t>();
             double r = noise->GetValue(unscale_(pa.x()), unscale_(pa.y()), slice_z) * cfg.thickness;
-            switch (cfg.mode) { //the curly code for testing
-                case FuzzySkinMode::Displacement :
-                    out.emplace_back(pa + (perp(p0p1).cast<double>().normalized() * r).cast<coord_t>(), p1.w, p1.perimeter_index);
-                    break;
-                case FuzzySkinMode::Extrusion :
-                    out.emplace_back(pa, std::max(p1.w + r + min_extrusion_width,  min_extrusion_width), p1.perimeter_index); 
-                    break;
-                case FuzzySkinMode::Combined :
+            switch (cfg.mode) {
+                case FuzzySkinMode::Displacement : {
+                    Point fp = pa + (perp(p0p1).cast<double>().normalized() * r).cast<coord_t>();
+                    out.emplace_back(fp, p1.w, p1.perimeter_index);
+                    out.back().p.set_fuzzy(true); // <-- Orca: Tag fuzzy skin point for post processing at the gcode generation stage
+                } break;
+                case FuzzySkinMode::Extrusion : {
+                    double new_w = std::max(p1.w + r + min_extrusion_width,  min_extrusion_width);
+                    out.emplace_back(pa, new_w, p1.perimeter_index);
+                    out.back().p.set_fuzzy(true); // <-- Orca: Tag fuzzy skin point for post processing at the gcode generation stage
+                } break;
+                case FuzzySkinMode::Combined : {
                     double rad = std::max(p1.w + r + min_extrusion_width,  min_extrusion_width);
-                    out.emplace_back(pa + (perp(p0p1).cast<double>().normalized() * ((rad  - p1.w) / 2)).cast<coord_t>(), rad, p1.perimeter_index); //0.05 - minimum width of extruded line
-                    break;
+                    Point fp = pa + (perp(p0p1).cast<double>().normalized() * ((rad - p1.w) / 2)).cast<coord_t>();
+                    out.emplace_back(fp, rad, p1.perimeter_index);
+                    out.back().p.set_fuzzy(true); // <-- Orca: Tag fuzzy skin point for post processing at the gcode generation stage
+                } break;
             }
         }
         dist_left_over = p0pa_dist - p0p1_size;
@@ -155,6 +170,7 @@ void fuzzy_extrusion_line(Arachne::ExtrusionJunctions& ext_lines, coordf_t slice
     while (out.size() < 3) {
         size_t point_idx = ext_lines.size() - 2;
         out.emplace_back(ext_lines[point_idx].p, ext_lines[point_idx].w, ext_lines[point_idx].perimeter_index);
+        out.back().p.set_fuzzy(true); // <-- Orca: Tag fuzzy skin point for post processing at the gcode generation stage
         if (point_idx == 0)
             break;
         --point_idx;
@@ -163,10 +179,17 @@ void fuzzy_extrusion_line(Arachne::ExtrusionJunctions& ext_lines, coordf_t slice
     if (ext_lines.back().p == ext_lines.front().p) { // Connect endpoints.
         out.front().p = out.back().p;
         out.front().w = out.back().w;
+        // copy flags from the closing point so front inherits fuzzy-ness if applicable
+        out.front().p.set_flags(out.back().p.flags()); // <-- Orca: preserve fuzzy flags at closure
     }
 
     if (out.size() >= 3)
         ext_lines = std::move(out);
+    
+    size_t cnt = 0;
+    for (const auto &j : out) if (j.p.is_fuzzy()) ++cnt;
+    fprintf(stdout, "[FUZZY] fuzzy_extrusion_line: flagged=%zu total=%zu\n",
+            cnt, out.size());
 }
 
 void group_region_by_fuzzify(PerimeterGenerator& g)
@@ -297,11 +320,23 @@ Polygon apply_fuzzy_skin(const Polygon& polygon, const PerimeterGenerator& perim
             fuzzified.points.clear();
 
             const auto fuzzy_current_segment = [&segment, &fuzzified, &r, slice_z]() {
-                fuzzified.points.push_back(segment.front());
+                // Start boundary (belongs to fuzzy run)
+                Point first = segment.front();
+                first.set_fuzzy(true);
+                fuzzified.points.push_back(first);
+                
                 const auto back = segment.back();
+                
+                // Fuzzify interior; fuzzy_polyline will tag produced points.
                 fuzzy_polyline(segment, false, slice_z, r.first);
+                
+                // Insert all generated fuzzy points (already tagged)
                 fuzzified.points.insert(fuzzified.points.end(), segment.begin(), segment.end());
-                fuzzified.points.push_back(back);
+
+                // End boundary (belongs to fuzzy run)
+                Point last = back;
+                last.set_fuzzy(true);
+                fuzzified.points.push_back(last);
                 segment.clear();
             };
 
@@ -366,11 +401,24 @@ void apply_fuzzy_skin(Arachne::ExtrusionLine* extrusion, const PerimeterGenerato
                     extrusion->junctions.clear();
 
                     const auto fuzzy_current_segment = [&segment, &extrusion, &r, slice_z]() {
-                        extrusion->junctions.push_back(segment.front());
+                        // Start boundary
+                        auto first = segment.front();
+                        first.p.set_fuzzy(true);
+                        extrusion->junctions.push_back(first);
+                        
                         const auto back = segment.back();
+                        
+                        // Fuzzify interior junctions; fuzzy_extrusion_line will tag created ones.
                         fuzzy_extrusion_line(segment, slice_z, r.first);
+                        
+                        // Insert generated fuzzy junctions
                         extrusion->junctions.insert(extrusion->junctions.end(), segment.begin(), segment.end());
-                        extrusion->junctions.push_back(back);
+                        
+                        // End boundary
+                        auto last = back;
+                        last.p.set_fuzzy(true);
+                        extrusion->junctions.push_back(last);
+                        
                         segment.clear();
                     };
 
