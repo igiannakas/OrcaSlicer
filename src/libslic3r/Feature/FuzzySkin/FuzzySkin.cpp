@@ -112,10 +112,6 @@ void fuzzy_polyline(Points& poly, bool closed, coordf_t slice_z, const FuzzySkin
     if (out.size() >= 3)
         poly = std::move(out);
 
-    size_t cnt = 0;
-    for (const auto &p : out) if (p.is_fuzzy()) ++cnt;
-    fprintf(stdout, "[FUZZY] fuzzy_polyline: flagged=%zu total=%zu\n",
-            cnt, out.size());
 }
 
 // Thanks Cura developers for this function.
@@ -186,10 +182,6 @@ void fuzzy_extrusion_line(Arachne::ExtrusionJunctions& ext_lines, coordf_t slice
     if (out.size() >= 3)
         ext_lines = std::move(out);
     
-    size_t cnt = 0;
-    for (const auto &j : out) if (j.p.is_fuzzy()) ++cnt;
-    fprintf(stdout, "[FUZZY] fuzzy_extrusion_line: flagged=%zu total=%zu\n",
-            cnt, out.size());
 }
 
 void group_region_by_fuzzify(PerimeterGenerator& g)

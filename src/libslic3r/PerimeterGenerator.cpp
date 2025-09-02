@@ -19,6 +19,8 @@
 #include <thread>
 #include "libslic3r/AABBTreeLines.hpp"
 #include "Print.hpp"
+#include "libslic3r/Algorithm/LineSplit.hpp"
+
 static const int overhang_sampling_number = 6;
 static const double narrow_loop_length_threshold = 10;
 //BBS: when the width of expolygon is smaller than
@@ -29,6 +31,106 @@ static constexpr double SMALLER_EXT_INSET_OVERLAP_TOLERANCE = 0.22;
 namespace Slic3r {
     
 using namespace Slic3r::Feature::FuzzySkin;
+
+// --- BEGIN: fuzzy tagged append helper --------------------------------------
+namespace {
+template <typename... Args>
+inline void extrusion_paths_append_tagged(ExtrusionPaths &out,
+                                          uint8_t feature_flags,
+                                          Args&&... args)
+{
+    const size_t n0 = out.size();
+    extrusion_paths_append(out, std::forward<Args>(args)...);
+    if (feature_flags != 0) {
+        for (size_t i = n0; i < out.size(); ++i) {
+            out[i].set_feature_flags(out[i].feature_flags() | feature_flags);
+        }
+        // debug
+        std::fprintf(stdout, "[FUZZY][tagged] +%zu paths now fuzzy (total=%zu)\n",
+                     out.size() - n0, out.size());
+        std::fflush(stdout);
+        // end debug
+    }
+}
+
+inline uint8_t flags_for_fuzzy(bool fuzzy) {
+    return fuzzy ? ExtrusionPath::FEAT_FUZZY : uint8_t(0);
+}
+
+// Split each ExtrusionPath in `paths` into sub-paths that are entirely inside (fuzzy)
+// or outside (non-fuzzy) of the active fuzzy regions for this loop.
+// Result replaces `paths`. Geometry is preserved; only segmentation + flags change.
+static void split_paths_by_fuzzy_regions(const PerimeterGenerator& g,
+                                         size_t loop_idx,
+                                         bool   is_contour,
+                                         ExtrusionPaths& paths)
+{
+    if (g.regions_by_fuzzify.empty())
+        return;
+
+    // Collect all regions that should be fuzzified for this loop.
+    ExPolygons fuzzy_regions;
+    for (const auto& kv : g.regions_by_fuzzify) {
+        const auto& cfg = kv.first;
+        if (should_fuzzify(cfg, g.layer_id, loop_idx, is_contour)) {
+            const ExPolygons& exps = kv.second;
+            fuzzy_regions.insert(fuzzy_regions.end(), exps.begin(), exps.end());
+        }
+    }
+    if (fuzzy_regions.empty())
+        return;
+
+    ExtrusionPaths out;
+    out.reserve(paths.size() * 2);
+
+    for (const ExtrusionPath& path : paths) {
+        // Split the *polyline* by the union of fuzzy regions.
+        const bool closed = path.is_closed();
+        const auto splitted = Algorithm::split_line(path.polyline, fuzzy_regions, closed);
+        if (splitted.empty()) {
+            // No intersections -> keep as-is (non-fuzzy unless caller set it).
+            out.emplace_back(path);
+            continue;
+        }
+
+        // Stitch contiguous runs with identical "clipped" (inside fuzzy) state.
+        Points segment;
+        segment.reserve(splitted.size());
+        bool current_flag = splitted.front().clipped;
+
+        auto flush_segment = [&](bool fuzzy_flag) {
+            if (segment.size() >= 2) {
+                Polyline pl;
+                pl.points = std::move(segment);
+                ExtrusionPath np(std::move(pl), path); // copy properties from original
+                np.set_fuzzy_path(fuzzy_flag);
+                out.emplace_back(std::move(np));
+            } else {
+                segment.clear();
+            }
+        };
+
+        for (const auto& j : splitted) {
+            if (j.clipped == current_flag) {
+                segment.push_back(j.p);
+            } else {
+                // Boundary: close previous run, start a new one at the shared junction.
+                flush_segment(current_flag);
+                segment.clear();
+                segment.push_back(j.p);
+                current_flag = j.clipped;
+            }
+        }
+        flush_segment(current_flag);
+    }
+
+    paths.swap(out);
+}
+
+
+} // anonymous namespace
+// --- END: fuzzy tagged append helper ----------------------------------------
+
 
 // Hierarchy of perimeters.
 class PerimeterGeneratorLoop {
@@ -202,6 +304,10 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
                                        perimeter_generator.overhang_flow.width(),
                                        perimeter_generator.overhang_flow.height());
             }
+            
+            // Make fuzzy segments explicit paths with flags.
+            split_paths_by_fuzzy_regions(perimeter_generator, loop.depth, loop.is_contour, paths);
+
 
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
@@ -221,6 +327,13 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
             path.width = extrusion_width;
             path.height     = (float)perimeter_generator.layer_height;
             paths.emplace_back(std::move(path));
+            // === Split into uniform fuzzy/non-fuzzy sub-paths ===
+            split_paths_by_fuzzy_regions(perimeter_generator, loop.depth, loop.is_contour, paths);
+            if (paths.empty())
+                continue;
+
+            // Keep connectivity/order stable after splitting.
+            chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
         }
 
         coll.append(ExtrusionLoop(std::move(paths), loop_role));
@@ -372,6 +485,13 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator& p
 
         const bool  is_contour = !extrusion->is_closed || pg_extrusion.is_contour;
         apply_fuzzy_skin(extrusion, perimeter_generator, is_contour);
+        
+        auto line_has_fuzzy = [](const Arachne::ExtrusionLine& l) {
+            for (const auto& j : l.junctions) if (j.p.is_fuzzy()) return true;
+            return false;
+        };
+        const uint8_t fuzzy_flags = flags_for_fuzzy(line_has_fuzzy(*extrusion));
+
 
         ExtrusionPaths paths;
         // detect overhanging/bridging perimeters

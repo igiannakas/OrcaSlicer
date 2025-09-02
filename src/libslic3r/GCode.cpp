@@ -5191,40 +5191,32 @@ bool GCode::_needSAFC(const ExtrusionPath &path)
     });
 }
 
-void GCode::set_accel_with_flavor(GCodeWriter &wr, std::string &gcode,
-                                  unsigned accel_i, unsigned jerk_i)
+void GCode::set_accel_with_flavor(GCodeWriter &wr, std::string &gcode, unsigned accel_i, double jerk)
 {
     if (wr.get_gcode_flavor() == gcfKlipper) {
-        gcode += wr.set_accel_and_jerk(accel_i, jerk_i);
+        gcode += wr.set_accel_and_jerk(accel_i, jerk);
     } else {
         gcode += wr.set_print_acceleration(accel_i);
-        gcode += wr.set_jerk_xy(jerk_i);
+        gcode += wr.set_jerk_xy(jerk);
     }
 }
 
-void GCode::maybe_toggle_accel_for_next_vertex(
-    bool next_is_fuzzy,
-    bool &fuzzy_accel_on,
-    unsigned normal_accel_i,
-    unsigned jerk_i,
-    std::string &gcode,
-    GCodeWriter &writer)
+
+void GCode::maybe_toggle_fuzzy_accel(const ExtrusionPath &path,
+                                     unsigned normal_accel_i,
+                                     double jerk,
+                                     std::string &gcode)
 {
-    if (next_is_fuzzy != fuzzy_accel_on) {
-        const unsigned target = next_is_fuzzy ? 50000u : normal_accel_i;
-        set_accel_with_flavor(writer, gcode, target, jerk_i);
-        fuzzy_accel_on = next_is_fuzzy;
+    const bool want_fuzzy = path.is_fuzzy_path(); // matches your ExtrusionPath API
+    if (want_fuzzy != m_fuzzy_accel_on) {
+        const unsigned target = want_fuzzy ? 50000u : normal_accel_i;
+        set_accel_with_flavor(m_writer, gcode, target, jerk);
+        m_fuzzy_accel_on = want_fuzzy;
     }
 }
 
 std::string GCode::_extrude(const ExtrusionPath &path, std::string description, double speed)
 {
-    
-    size_t cnt = 0;
-    for (const auto &p : path.polyline.points) if (p.is_fuzzy()) ++cnt;
-    fprintf(stdout, "[FUZZY] _extrude entry: role=%d flagged=%zu total=%zu\n",
-            int(path.role()), cnt, path.polyline.points.size());
-    
     
     std::string gcode;
 
@@ -5320,27 +5312,8 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
         gcode += m_writer.set_jerk_xy(jerk);
     }
     
-    // Turn jerk (double) into integer for the low-level setters
-    unsigned jerk_i = (unsigned) (jerk >= 0.0 ? std::floor(jerk + 0.5) : 0u);
-
-    // We only try to toggle accel if there is a baseline accel/jerk to return to
-    bool accel_control_active = (acceleration_i > 0u) || (jerk_i > 0u);
-
-    // Track whether we are currently in "fuzzy accel" mode
-    bool fuzzy_accel_on = false;
-
-    // Small convenience lambda to guard the toggle behind accel_control_active.
-    auto maybe_toggle_for_next = [&](bool next_is_fuzzy) {
-        if (accel_control_active) {
-            this->maybe_toggle_accel_for_next_vertex(next_is_fuzzy,
-                                                     fuzzy_accel_on,
-                                                     acceleration_i,
-                                                     jerk_i,
-                                                     gcode,
-                                                     m_writer);
-        }
-    };
-
+    // If this path is a fuzzy segment, override accel to 50000; otherwise keep baseline.
+    maybe_toggle_fuzzy_accel(path, acceleration_i, jerk, gcode);
 
     // calculate effective extrusion length per distance unit (e_per_mm)
     double filament_flow_ratio = m_config.option<ConfigOptionFloats>("filament_flow_ratio")->get_at(0);
@@ -5821,14 +5794,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                             tempDescription += Slic3r::format(" | Old Flow Value: %0.5f Length: %0.5f",oldE, line_length);
                         }
                     }
-                    // FUZZY: toggle accel for the upcoming endpoint
-                    maybe_toggle_for_next(line.b.is_fuzzy());
-                    if(line.b.is_fuzzy()){
-                        printf("Fuzzy\n");
-                    }
-                    if(line.a.is_fuzzy()){
-                        printf("Fuzzy a\n");
-                    }
                     if (sloped == nullptr) {
                         // Normal extrusion
                         gcode += m_writer.extrude_to_xy(
@@ -5845,11 +5810,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                             dE * e_ratio,
                             GCodeWriter::full_gcode_comment ? tempDescription : "", path.is_force_no_extrusion());
                     }
-                }
-                // FUZZY: restore baseline accel if we ended in fuzzy mode
-                if (accel_control_active && fuzzy_accel_on) {
-                    this->set_accel_with_flavor(m_writer, gcode, acceleration_i, jerk_i);
-                    fuzzy_accel_on = false;
                 }
             } else {
                 // BBS: start to generate gcode from arc fitting data which includes line and arc
@@ -5876,8 +5836,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                                 }
                             }
                             
-                            maybe_toggle_for_next(line.b.is_fuzzy());   // Fuzzy accel adjustment
-                            
                             gcode += m_writer.extrude_to_xy(
                                 this->point_to_gcode(line.b),
                                 dE,
@@ -5902,14 +5860,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                             }
                         }
                         
-                        bool next_is_fuzzy = false;
-                        if (fitting_result[fitting_index].end_point_index < path.polyline.points.size()) {
-                            next_is_fuzzy = path.polyline.points[fitting_result[fitting_index].end_point_index].is_fuzzy();
-                        } else {
-                            next_is_fuzzy = arc.end_point.is_fuzzy();
-                        }
-                        maybe_toggle_for_next(next_is_fuzzy);
-                        
                         gcode += m_writer.extrude_arc_to_xy(
                             this->point_to_gcode(arc.end_point),
                             center_offset,
@@ -5923,10 +5873,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                         assert(0);
                         break;
                     }
-                }
-                if (accel_control_active && fuzzy_accel_on) {
-                    this->set_accel_with_flavor(m_writer, gcode, acceleration_i, jerk_i);
-                    fuzzy_accel_on = false;
                 }
             }
         }
@@ -6039,8 +5985,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
                     tempDescription += Slic3r::format(" | Old Flow Value: %0.5f Length: %0.5f",oldE, line_length);
                 }
             }
-            // FUZZY: toggle accel for the upcoming point
-                maybe_toggle_for_next(new_points[i].p.is_fuzzy());
             
             if (sloped == nullptr) {
                 // Normal extrusion
@@ -6055,11 +5999,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
             prev = p;
 
         }
-        // FUZZY: restore baseline accel if we ended in fuzzy mode
-        if (accel_control_active && fuzzy_accel_on) {
-            this->set_accel_with_flavor(m_writer, gcode, acceleration_i, jerk_i);
-            fuzzy_accel_on = false;
-        }
     }
     if (m_enable_cooling_markers) {
             gcode += ";_EXTRUDE_END\n";
@@ -6067,6 +6006,12 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
 
     if (path.role() != ExtrusionRole::erGapFill) {
       m_last_notgapfill_extrusion_role = path.role();
+    }
+
+    // If this path was fuzzy, restore baseline acceleration so following travels aren’t at 50000.
+    if (m_fuzzy_accel_on && path.is_fuzzy_path()) {
+        set_accel_with_flavor(m_writer, gcode, acceleration_i, jerk);
+        m_fuzzy_accel_on = false;
     }
 
     this->set_last_pos(path.last_point());

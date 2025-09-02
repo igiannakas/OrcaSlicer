@@ -158,9 +158,9 @@ public:
     // Height of the extrusion, used for visualization purposes.
     float height;
 
-    ExtrusionPath() : mm3_per_mm(-1), width(-1), height(-1), m_role(erNone), m_no_extrusion(false) {}
-    ExtrusionPath(ExtrusionRole role) : mm3_per_mm(-1), width(-1), height(-1), m_role(role), m_no_extrusion(false) {}
-    ExtrusionPath(ExtrusionRole role, double mm3_per_mm, float width, float height, bool no_extrusion = false) : mm3_per_mm(mm3_per_mm), width(width), height(height), m_role(role), m_no_extrusion(no_extrusion) {}
+    ExtrusionPath() : mm3_per_mm(-1), width(-1), height(-1), m_role(erNone), m_no_extrusion(false), m_feature_flags(0) {}
+    ExtrusionPath(ExtrusionRole role) : mm3_per_mm(-1), width(-1), height(-1), m_role(role), m_no_extrusion(false), m_feature_flags(0) {}
+    ExtrusionPath(ExtrusionRole role, double mm3_per_mm, float width, float height, bool no_extrusion = false) : mm3_per_mm(mm3_per_mm), width(width), height(height), m_role(role), m_no_extrusion(no_extrusion), m_feature_flags(0) {}
 
     ExtrusionPath(const ExtrusionPath &rhs)
         : polyline(rhs.polyline)
@@ -170,6 +170,7 @@ public:
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
+        , m_feature_flags(rhs.m_feature_flags)
     {}
     ExtrusionPath(ExtrusionPath &&rhs)
         : polyline(std::move(rhs.polyline))
@@ -179,6 +180,7 @@ public:
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
+        , m_feature_flags(rhs.m_feature_flags)
     {}
     ExtrusionPath(const Polyline &polyline, const ExtrusionPath &rhs)
         : polyline(polyline)
@@ -188,6 +190,7 @@ public:
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
+        , m_feature_flags(rhs.m_feature_flags)
     {}
     ExtrusionPath(Polyline &&polyline, const ExtrusionPath &rhs)
         : polyline(std::move(polyline))
@@ -197,12 +200,14 @@ public:
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
+        , m_feature_flags(rhs.m_feature_flags)
     {}
 
     ExtrusionPath& operator=(const ExtrusionPath& rhs) {
         m_can_reverse = rhs.m_can_reverse;
         m_role = rhs.m_role;
         m_no_extrusion = rhs.m_no_extrusion;
+        m_feature_flags = rhs.m_feature_flags;
         this->mm3_per_mm = rhs.mm3_per_mm;
         this->width = rhs.width;
         this->height = rhs.height;
@@ -213,6 +218,7 @@ public:
         m_can_reverse = rhs.m_can_reverse;
         m_role = rhs.m_role;
         m_no_extrusion = rhs.m_no_extrusion;
+        m_feature_flags = rhs.m_feature_flags;
         this->mm3_per_mm = rhs.mm3_per_mm;
         this->width = rhs.width;
         this->height = rhs.height;
@@ -266,12 +272,24 @@ public:
     void set_reverse() override { m_can_reverse = false; }
     bool can_reverse() const override { return m_can_reverse; }
 
+    // --- Orca: path-level feature flags (compact)
+    static constexpr uint8_t FEAT_FUZZY = 0x01;
+    bool is_fuzzy_path() const { return (m_feature_flags & FEAT_FUZZY) != 0; }
+    void set_fuzzy_path(bool on = true) {
+        if (on) m_feature_flags |= FEAT_FUZZY;
+        else    m_feature_flags &= ~FEAT_FUZZY;
+    }
+    uint8_t feature_flags() const { return m_feature_flags; }
+    void set_feature_flags(uint8_t flags) { m_feature_flags = flags; }
+    
 private:
     void _inflate_collection(const Polylines &polylines, ExtrusionEntityCollection* collection) const;
     bool m_can_reverse = true;
     ExtrusionRole m_role;
     //BBS
     bool m_no_extrusion = false;
+    // Orca: Fuzzy skin feature flag
+    uint8_t m_feature_flags = 0;
 };
 
 class ExtrusionPathSloped : public ExtrusionPath

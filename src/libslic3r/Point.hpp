@@ -278,7 +278,7 @@ public:
 
     // Orca: Fuzzy skin convenience methods
     bool    is_fuzzy() const              { return has_flag(FLAG_FUZZY); }
-    void    set_fuzzy(bool on=true)       { set_flag(FLAG_FUZZY, on); if(is_fuzzy()) std::cout << "fuzy"<<std::endl; }
+    void    set_fuzzy(bool on=true)       { set_flag(FLAG_FUZZY, on); }
     void    set_flags(uint8_t f)          { m_flags = f; }   // bulk replace
 
 private:
