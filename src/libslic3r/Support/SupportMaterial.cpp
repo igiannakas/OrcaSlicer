@@ -951,7 +951,7 @@ public:
         }
         ::fclose(file);
 
-        m_support_polygons_deserialized = simplify_polygons(m_support_polygons_deserialized, false);
+        m_support_polygons_deserialized = simplify_polygons(m_support_polygons_deserialized);
         //m_support_polygons_deserialized = to_polygons(union_ex(m_support_polygons_deserialized, false));
 
         // Create an EdgeGrid, initialize it with projection, initialize signed distance field.
@@ -1390,7 +1390,6 @@ static inline ExPolygons detect_overhangs(
     double thresh_angle = object_config.support_threshold_angle.value > 0 ? object_config.support_threshold_angle.value + 1 : 0;
     thresh_angle = std::min(thresh_angle, 89.); // BBS should be smaller than 90
     const double threshold_rad = Geometry::deg2rad(thresh_angle);
-    const coordf_t max_bridge_length = scale_(object_config.max_bridge_length.value);
     const bool bridge_no_support = object_config.bridge_no_support.value;
     const coordf_t xy_expansion = scale_(object_config.support_expansion.value);
     float lower_layer_offset = 0;

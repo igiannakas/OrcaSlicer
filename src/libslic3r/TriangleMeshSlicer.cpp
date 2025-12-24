@@ -2168,7 +2168,7 @@ static void triangulate_slice(
     float                    z,
     bool                     triangulate,
     bool                     normals_down,
-    const std::map<int, Vec3f*> &section_vertices_map)
+    const std::map<int, Vec3f> &section_vertices_map)
 {
     sort_remove_duplicates(slice_vertices);
 
@@ -2240,7 +2240,7 @@ static void triangulate_slice(
                 int   idx = -1;
                 bool exist = false;
                 for (auto iter = section_vertices_map.begin(); iter != section_vertices_map.end(); iter++) {
-                    if (is_equal(v, *iter->second)) {
+                    if (is_equal(v, iter->second)) {
                         idx   = iter->first;
                         exist = true;
                         break;
@@ -2348,7 +2348,7 @@ void cut_mesh(const indexed_triangle_set& mesh, float z, indexed_triangle_set* u
     IntersectionLines  upper_lines, lower_lines;
     std::vector<int>   upper_slice_vertices, lower_slice_vertices;
     std::vector<Vec3i32> facets_edge_ids = its_face_edge_ids(mesh);
-    std::map<int, Vec3f *> section_vertices_map;
+    std::map<int, Vec3f> section_vertices_map;
 
     for (int facet_idx = 0; facet_idx < int(mesh.indices.size()); ++ facet_idx) {
         const stl_triangle_vertex_indices &facet = mesh.indices[facet_idx];
@@ -2357,8 +2357,8 @@ void cut_mesh(const indexed_triangle_set& mesh, float z, indexed_triangle_set* u
         float max_z = std::max(vertices[0].z(), std::max(vertices[1].z(), vertices[2].z()));
 
         for (size_t i = 0; i < 3; i++) {
-            if (is_equal(z, vertices[i].z()) && section_vertices_map[facet(i)] == nullptr) {
-                section_vertices_map[facet(i)] = new Vec3f(vertices[i].x(), vertices[i].y(), vertices[i].z());
+            if (is_equal(z, vertices[i].z()) && section_vertices_map.find(facet(i)) == section_vertices_map.end()) {
+                section_vertices_map.emplace(facet(i), vertices[i]);
             }
         }
         // intersect facet with cutting plane
@@ -2474,7 +2474,7 @@ void cut_mesh(const indexed_triangle_set& mesh, float z, indexed_triangle_set* u
             // intersect v0-v1 and v2-v0 with cutting plane and make new vertices
             auto new_vertex = [upper, lower, &upper_slice_vertices, &lower_slice_vertices](const Vec3f &a, const int ia, const Vec3f &b, const int ib, const Vec3f &c,
                                                                                            const int ic, const Vec3f &new_pt, bool &is_new_vertex) {
-                int iupper, ilower;
+                int iupper = 0, ilower = 0;
                 is_new_vertex = false;
                 if (is_equal(new_pt, a))
                     iupper = ilower = ia;
@@ -2554,7 +2554,6 @@ void cut_mesh(const indexed_triangle_set& mesh, float z, indexed_triangle_set* u
         }
 #endif // NDEBUG
     }
-    std::map<int, Vec3f*>().swap(section_vertices_map);
 }
 
 } // namespace Slic3r

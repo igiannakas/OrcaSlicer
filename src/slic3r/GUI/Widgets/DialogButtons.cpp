@@ -5,13 +5,14 @@
 namespace Slic3r { namespace GUI {
 
 // ORCA standardize dialog buttons
-DialogButtons::DialogButtons(wxWindow* parent, std::vector<wxString> non_translated_labels, const wxString& primary_btn_translated_label)
-    : wxWindow(parent, wxID_ANY)
+DialogButtons::DialogButtons(wxWindow* parent, std::vector<wxString> non_translated_labels, const wxString& primary_btn_translated_label, const int left_aligned_buttons_count)
+    : wxPanel(parent, wxID_ANY)
 {
     m_parent  = parent;
     m_sizer   = new wxBoxSizer(wxHORIZONTAL);
     m_primary = primary_btn_translated_label;
     m_alert   = wxEmptyString;
+    m_left_aligned_buttons_count = left_aligned_buttons_count;
     SetBackgroundColour(StateColor::darkModeColorFor(wxColour("#FFFFFF")));
 
     // Add all to array
@@ -55,6 +56,13 @@ Button* DialogButtons::GetButtonFromLabel(wxString translated_label) {
     return nullptr;
 }
 
+Button* DialogButtons::GetButtonFromIndex(int index) {
+    if(index >= 0 && index < m_buttons.size())
+        return m_buttons[index];
+    else
+        return nullptr;
+}
+
 Button* DialogButtons::PickFromList(std::set<wxStandardID> ID_list) {
     // Picks first button from given list
     Button* b;
@@ -73,8 +81,10 @@ Button* DialogButtons::GetAPPLY()  {return GetButtonFromID(wxID_APPLY)   ;}
 Button* DialogButtons::GetCONFIRM(){return GetButtonFromID(wxID_APPLY)   ;}
 Button* DialogButtons::GetNO()     {return GetButtonFromID(wxID_NO)      ;}
 Button* DialogButtons::GetCANCEL() {return GetButtonFromID(wxID_CANCEL)  ;}
-Button* DialogButtons::GetBACK()   {return GetButtonFromID(wxID_BACKWARD);}
-Button* DialogButtons::GetFORWARD(){return GetButtonFromID(wxID_FORWARD) ;}
+Button* DialogButtons::GetRETURN() {return GetButtonFromID(wxID_BACKWARD);} // gets Return button
+Button* DialogButtons::GetNEXT()   {return GetButtonFromID(wxID_FORWARD) ;}
+Button* DialogButtons::GetFIRST()  {return GetButtonFromIndex(0)         ;}
+Button* DialogButtons::GetLAST()   {return GetButtonFromIndex(m_buttons.size() - 1);}
 
 void DialogButtons::SetPrimaryButton(wxString translated_label) {
     // use _L("Create") translated text for custom buttons
@@ -92,28 +102,11 @@ void DialogButtons::SetPrimaryButton(wxString translated_label) {
 
     m_primary = translated_label;
 
-    btn->SetFocus();
-    // we won't need color definations after button style management
-    StateColor clr_bg = StateColor(
-        std::pair(wxColour("#009688"), (int)StateColor::NotHovered),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Disabled),
-        std::pair(wxColour("#009688"), (int)StateColor::Pressed),
-        std::pair(wxColour("#26A69A"), (int)StateColor::Hovered),
-        std::pair(wxColour("#009688"), (int)StateColor::Normal),
-        std::pair(wxColour("#009688"), (int)StateColor::Enabled)
-    );
-    btn->SetBackgroundColor(clr_bg);
-    StateColor clr_br = StateColor(
-        std::pair(wxColour("#009688"), (int)StateColor::NotFocused),
-        std::pair(wxColour("#26A69A"), (int)StateColor::Focused)
-    );
-    btn->SetBorderColor(clr_br);
-    StateColor clr_tx = StateColor(
-        std::pair(wxColour("#6B6A6A"), (int)StateColor::Disabled),
-        std::pair(wxColour("#FEFEFE"), (int)StateColor::Hovered),
-        std::pair(wxColour("#FEFEFE"), (int)StateColor::Normal)
-    );
-    btn->SetTextColor(clr_tx);
+    // apply focus only if there is no focused element exist. this prevents stealing focus from input boxes
+    if(m_parent->FindFocus() == nullptr)
+        btn->SetFocus();
+ 
+    btn->SetStyle(ButtonStyle::Confirm, ButtonType::Choice);
 }
 
 void DialogButtons::SetAlertButton(wxString translated_label) {
@@ -131,83 +124,31 @@ void DialogButtons::SetAlertButton(wxString translated_label) {
 
     m_alert = translated_label;
 
-    // we won't need color definations after button style management
-    StateColor clr_bg = StateColor(
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::NotHovered),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Disabled),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Pressed),
-        std::pair(wxColour("#CD1F00"), (int)StateColor::Hovered),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Normal),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Enabled)
-    );
-    btn->SetBackgroundColor(clr_bg);
-    StateColor clr_br = StateColor(
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::NotFocused),
-        std::pair(wxColour("#26A69A"), (int)StateColor::Focused)
-    );
-    btn->SetBorderColor(clr_br);
-    StateColor clr_tx = StateColor(
-        std::pair(wxColour("#CD1F00"), (int)StateColor::NotHovered),
-        std::pair(wxColour("#6B6A6A"), (int)StateColor::Disabled),
-        std::pair(wxColour("#CD1F00"), (int)StateColor::Pressed),
-        std::pair(wxColour("#FFFFFD"), (int)StateColor::Hovered),
-        std::pair(wxColour("#CD1F00"), (int)StateColor::Focused),
-        std::pair(wxColour("#CD1F00"), (int)StateColor::Normal)
-    );
-    btn->SetTextColor(clr_tx);
+    btn->SetStyle(ButtonStyle::Alert, ButtonType::Choice);
 }
 
 void DialogButtons::UpdateButtons() {
     m_sizer->Clear();
     SetBackgroundColour(StateColor::darkModeColorFor(wxColour("#FFFFFF")));
-    // we won't need color definations after button style management
-    StateColor clr_bg = StateColor(
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::NotHovered),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Disabled),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Pressed),
-        std::pair(wxColour("#D4D4D4"), (int)StateColor::Hovered),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Normal),
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::Enabled)
-    );
-    StateColor clr_br = StateColor(
-        std::pair(wxColour("#DFDFDF"), (int)StateColor::NotFocused),
-        std::pair(wxColour("#26A69A"), (int)StateColor::Focused)
-    );
-    StateColor clr_tx = StateColor(
-        std::pair(wxColour("#6B6A6A"), (int)StateColor::Disabled),
-        std::pair(wxColour("#262E30"), (int)StateColor::Hovered),
-        std::pair(wxColour("#262E30"), (int)StateColor::Normal)
-    );
 
     // Apply standard style to all
     for (Button* btn : m_buttons) {
-        btn->SetFont(Label::Body_14);
-        btn->SetMinSize(wxSize(FromDIP(100),FromDIP(32)));
-        btn->SetPaddingSize(wxSize(FromDIP(12), FromDIP(8)));
-        btn->SetCornerRadius(FromDIP(4));
-        btn->SetBorderWidth(FromDIP(1));
-        btn->SetBackgroundColor(clr_bg);
-        btn->SetBorderColor(clr_br);
-        btn->SetTextColor(clr_tx);
+        btn->SetStyle(ButtonStyle::Regular, ButtonType::Choice);
         btn->Bind(wxEVT_KEY_DOWN, &DialogButtons::on_keydown, this);
     }
 
-    int btn_gap = FromDIP(10);
+    int btn_gap = FromDIP(ButtonProps::ChoiceButtonGap());
 
-    auto list = m_left_align_IDs;
-    auto on_left = [list](int id){
-        return list.find(wxStandardID(id)) != list.end();
-    };
+    if(m_left_aligned_buttons_count == 0)
+        m_sizer->AddSpacer(btn_gap);
 
-    for (Button* btn : m_buttons)  // Left aligned
-        if(on_left(btn->GetId()))
-            m_sizer->Add(btn, 0,  wxLEFT | wxTOP | wxBOTTOM | wxALIGN_CENTER_VERTICAL, btn_gap);
+    for (int i = 0; i < m_buttons.size(); i++) {
+        if(m_left_aligned_buttons_count == i)
+            m_sizer->AddStretchSpacer();
 
-    m_sizer->AddStretchSpacer();
-
-    for (Button* btn : m_buttons) // Right aligned
-        if(!on_left(btn->GetId()))
-            m_sizer->Add(btn, 0, wxRIGHT | wxTOP | wxBOTTOM | wxALIGN_CENTER_VERTICAL, btn_gap);
+        auto margin_to = (i >= m_left_aligned_buttons_count ? wxRIGHT : wxLEFT);
+        m_sizer->Add(m_buttons[i], 0, margin_to | wxTOP | wxBOTTOM | wxALIGN_CENTER_VERTICAL, btn_gap);
+    }
 
     SetPrimaryButton(m_primary);
     SetAlertButton(m_alert);
@@ -218,6 +159,11 @@ void DialogButtons::UpdateButtons() {
 
 int DialogButtons::FromDIP(int d) {
     return m_parent->FromDIP(d);
+}
+
+void DialogButtons::SetLeftAlignedButtonsCount(int left_aligned_buttons_count){
+    m_left_aligned_buttons_count = left_aligned_buttons_count;
+    UpdateButtons();
 }
 
 // This might be helpful for future use

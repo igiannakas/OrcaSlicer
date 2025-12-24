@@ -147,7 +147,7 @@ void CalibrationPAStartPage::on_reset_page()
 
 void CalibrationPAStartPage::on_device_connected(MachineObject* obj)
 {
-    //enable all button
+    // enable all button
     m_action_panel->enable_button(CaliPageActionType::CALI_ACTION_MANAGE_RESULT, true);
     m_action_panel->enable_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, true);
     m_action_panel->enable_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, true);
@@ -168,9 +168,8 @@ void CalibrationPAStartPage::on_device_connected(MachineObject* obj)
             m_action_panel->bind_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, false);
         }
 
-        // is support auto cali
-        bool is_support_pa_auto = (obj->home_flag >> 16 & 1) == 1;
-        if (!is_support_pa_auto) {
+
+        if (!obj->is_support_pa_calibration) {
             m_action_panel->show_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, false);
         }
     }
@@ -217,11 +216,11 @@ void CalibrationFlowRateStartPage::create_page(wxWindow* parent)
     m_top_sizer->Add(m_page_caption, 0, wxEXPAND, 0);
     create_when(parent,
         _L("When to use Flow Rate Calibration"),
-        _L("After using Flow Dynamics Calibration, there might still be some extrusion issues, such as:\
-\n1. Over-Extrusion: Excess material on your printed object, forming blobs or zits, or the layers seem thicker than expected and not uniform.\
-\n2. Under-Extrusion: Very thin layers, weak infill strength, or gaps in the top layer of the model, even when printing slowly.\
-\n3. Poor Surface Quality: The surface of your prints seems rough or uneven.\
-\n4. Weak Structural Integrity: Prints break easily or don't seem as sturdy as they should be."));
+        _L("After using Flow Dynamics Calibration, there might still be some extrusion issues, such as:\n"
+           "1. Over-Extrusion: Excess material on your printed object, forming blobs or zits, or the layers seem thicker than expected and not uniform\n"
+           "2. Under-Extrusion: Very thin layers, weak infill strength, or gaps in the top layer of the model, even when printing slowly\n"
+           "3. Poor Surface Quality: The surface of your prints seems rough or uneven\n"
+           "4. Weak Structural Integrity: Prints break easily or don't seem as sturdy as they should be"));
 
     m_top_sizer->Add(m_when_title);
     m_top_sizer->Add(m_when_content);
@@ -297,7 +296,14 @@ void CalibrationFlowRateStartPage::on_device_connected(MachineObject* obj)
     m_action_panel->enable_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, true);
     m_action_panel->enable_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, true);
 
-    if (obj->get_printer_series() == PrinterSeries::SERIES_X1) {
+    if (obj->get_printer_series() == PrinterSeries::SERIES_P1P) {
+        m_action_panel->show_button(CaliPageActionType::CALI_ACTION_MANAGE_RESULT, false);
+        m_action_panel->show_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, false);
+        m_action_panel->show_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, true);
+
+        m_action_panel->bind_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, false);
+    }
+    else if (obj->get_printer_series() == PrinterSeries::SERIES_X1) {
         m_action_panel->show_button(CaliPageActionType::CALI_ACTION_MANAGE_RESULT, false);
         m_action_panel->show_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, true);
         m_action_panel->show_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, true);
@@ -310,17 +316,9 @@ void CalibrationFlowRateStartPage::on_device_connected(MachineObject* obj)
             m_action_panel->bind_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, false);
         }
     }
-    else if (obj->get_printer_series() == PrinterSeries::SERIES_P1P) {
-        m_action_panel->show_button(CaliPageActionType::CALI_ACTION_MANAGE_RESULT, false);
-        m_action_panel->show_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, false);
-        m_action_panel->show_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, true);
-
-        m_action_panel->bind_button(CaliPageActionType::CALI_ACTION_MANUAL_CALI, false);
-    }
 
     //is support auto cali
-    bool is_support_flow_rate_auto = (obj->home_flag >> 15 & 1) == 1;
-    if (!is_support_flow_rate_auto) {
+    if (!obj->is_support_flow_calibration) {
         m_action_panel->show_button(CaliPageActionType::CALI_ACTION_AUTO_CALI, false);
     }
 }
