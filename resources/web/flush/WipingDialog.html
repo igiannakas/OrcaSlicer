@@ -432,10 +432,11 @@
         return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
       }
 
-
       function updateVolumeRange(min_volume,max_volume){
+        // Orca: "Typical" guidance only unlinked from upper bound in the slicer.
+        const TYPICAL_MAX_FLUSH_VOLUME = 900;
         const panel = document.getElementById('volume_range_panel');
-        panel.innerText = panel.innerText.replace(/\[.*\]/, `[${min_volume}, ${max_volume}]`);
+        panel.innerText = panel.innerText.replace(/\[.*\]/, `[${min_volume}, ${TYPICAL_MAX_FLUSH_VOLUME}]`);
       }
 
       function updateMultiplierRange(min_multiplier,max_multiplier){
@@ -604,13 +605,31 @@
 
 
       function updateWarningTexts() {
-        let val = parseFloat(document.getElementById("multiplierInput").value);
-        const input = document.getElementById('multiplierInput');
-        if (val !== 1.0) {
-            input.style.color = 'orange';
-        } else {
-            input.style.color = 'black';
-        }
+          // ORCA: Relax flush multiplier showing as out of "threshold" in the UI
+          let val = parseFloat(document.getElementById("multiplierInput").value);
+          const input = document.getElementById("multiplierInput");
+
+          const MULT_MIN = 0.8;  // 20% down
+          const MULT_MAX = 2.0;  // 100% up
+
+          if (!Number.isFinite(val)) {
+            // Invalid input -> warn
+            input.style.color = "orange";
+          } else if (val < MULT_MIN || val > MULT_MAX) {
+            // Out of allowed band -> warn
+            input.style.color = "orange";
+          } else {
+            // In allowed band -> use theme default (better for dark mode)
+            input.style.removeProperty("color");
+          }
+
+        //let val = parseFloat(document.getElementById("multiplierInput").value);
+        //const input = document.getElementById('multiplierInput');
+        //if (val !== 1.0) {
+        //    input.style.color = 'orange';
+        //} else {
+        //    input.style.color = 'black';
+        //}
 
         let hasException = false;
         for (let i = 0; i < m_number_of_filaments; i++) {
