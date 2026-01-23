@@ -309,7 +309,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 show_error(m_parent, _(L("Invalid numeric.")));
                 set_value(double_to_string(val), true);
             }
-            if (!m_opt.is_value_valid(val))
+            if (m_opt.min > val || val > m_opt.max)
             {
                 if (!check_value) {
                     m_value.clear();
@@ -511,7 +511,6 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
         str.Replace(" ", wxEmptyString, true);
         if (!str.IsEmpty()) {
             bool invalid_val = false;
-            bool out_of_range_val = false;
             wxStringTokenizer thumbnails(str, ",");
             while (thumbnails.HasMoreTokens()) {
                 wxString token = thumbnails.GetNextToken();
@@ -522,26 +521,8 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                     if (x_str.ToDouble(&x) && thumbnail.HasMoreTokens()) {
                         wxString y_str = thumbnail.GetNextToken();
                         if (y_str.ToDouble(&y) && !thumbnail.HasMoreTokens()) {
-                            if (m_opt_id == "bed_exclude_area") {
-                                if (0 <= x && x <= 350 && 0 <= y && y <= 350) {
-                                    out_values.push_back(Vec2d(x, y));
-                                    continue;
-                                }
-                            }
-                            else if (m_opt_id == "printable_area") {
-                                if (0 <= x && x <= 1000 && 0 <= y && y <= 1000) {
-                                    out_values.push_back(Vec2d(x, y));
-                                    continue;
-                                }
-                            }
-                            else {
-                                if (0 < x && x < 1000 && 0 < y && y < 1000) {
-                                    out_values.push_back(Vec2d(x, y));
-                                    continue;
-                                }
-                            }
-                            out_of_range_val = true;
-                            break;
+                            out_values.push_back(Vec2d(x, y));
+                            continue;
                         }
                     }
                 }
@@ -549,14 +530,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 break;
             }
 
-            if (out_of_range_val) {
-                wxString text_value;
-                if (!m_value.empty())
-                    text_value = get_thumbnails_string(boost::any_cast<std::vector<Vec2d>>(m_value));
-                set_value(text_value, true);
-                show_error(m_parent, _L("Value is out of range."));
-            }
-            else if (invalid_val) {
+            if (invalid_val) {
                 wxString text_value;
                 if (!m_value.empty())
                     text_value = get_thumbnails_string(boost::any_cast<std::vector<Vec2d>>(m_value));
@@ -736,6 +710,13 @@ void TextCtrl::BUILD() {
 		const ConfigOptionStrings *vec = m_opt.get_default_value<ConfigOptionStrings>();
 		if (vec == nullptr || vec->empty()) break; //for the case of empty default value
 		text_value = vec->get_at(m_opt_idx);
+		// For multiline fields, unescape newlines and other escape sequences
+		if (m_opt.multiline) {
+			std::string unescaped_value;
+			if (unescape_string_cstyle(text_value.ToStdString(), unescaped_value)) {
+				text_value = wxString::FromUTF8(unescaped_value);
+			}
+		}
 		break;
 	}
     case coPoint:
@@ -757,7 +738,7 @@ void TextCtrl::BUILD() {
         : builder2.build(m_parent, "", "", "", wxDefaultPosition, size, wxTE_PROCESS_ENTER);
     temp->SetLabel(_L(m_opt.sidetext));
 	auto text_ctrl = m_opt.multiline ? (wxTextCtrl *)temp : ((TextInput *) temp)->GetTextCtrl();
-    text_ctrl->SetLabel(text_value);
+    text_ctrl->SetValue(text_value);
     temp->SetSize(size);
     m_combine_side_text = !m_opt.multiline;
     if (parent_is_custom_ctrl && m_opt.height < 0)
@@ -1107,8 +1088,8 @@ void SpinCtrl::BUILD() {
 		break;
 	}
 
-    const int min_val = m_opt.min == -FLT_MAX ? 0 : (int)m_opt.min;
-	const int max_val = m_opt.max < FLT_MAX ? (int)m_opt.max : INT_MAX;
+    const int min_val = m_opt.min == INT_MIN ? 0 : m_opt.min;
+	const int max_val = m_opt.max < 2147483647 ? m_opt.max : 2147483647;
 
     static Builder<SpinInput> builder;
 	auto temp = builder.build(m_parent, "", "", wxDefaultPosition, size,
@@ -1164,7 +1145,7 @@ void SpinCtrl::BUILD() {
         if (!parsed || value < INT_MIN || value > INT_MAX)
             tmp_value = UNDEF_VALUE;
         else {
-            tmp_value = std::min(std::max((int)value, temp->GetMin()), temp->GetMax());
+            tmp_value = std::min(std::max((int)value, m_opt.min), m_opt.max);
 #ifdef __WXOSX__
 #ifdef UNDEFINED__WXOSX__ // BBS
             // Forcibly set the input value for SpinControl, since the value
@@ -1217,7 +1198,7 @@ void SpinCtrl::set_value(const boost::any& value, bool change_event) {
     m_disable_change_event = !change_event;
     m_value = value;
     if (value.empty()) { // BBS: null value
-        dynamic_cast<SpinInput*>(window)->SetValue(dynamic_cast<SpinInput*>(window)->GetMin());
+        dynamic_cast<SpinInput*>(window)->SetValue(m_opt.min);
         dynamic_cast<SpinInput*>(window)->GetTextCtrl()->SetValue("");
     }
     else {
@@ -2158,8 +2139,8 @@ boost::any& PointCtrl::get_value()
         show_error(m_parent, _L("Invalid numeric."));
 	}
 	else
-	if (!m_opt.is_value_valid(x) ||
-		!m_opt.is_value_valid(y))
+	if (m_opt.min > x || x > m_opt.max ||
+		m_opt.min > y || y > m_opt.max)
 	{
 		if (m_opt.min > x) x = m_opt.min;
 		if (x > m_opt.max) x = m_opt.max;
@@ -2218,8 +2199,8 @@ void SliderCtrl::BUILD()
 	auto temp = new wxBoxSizer(wxHORIZONTAL);
 
 	auto def_val = m_opt.get_default_value<ConfigOptionInt>()->value;
-	auto min = m_opt.min == -FLT_MAX ? 0   : (int)m_opt.min;
-	auto max = m_opt.max ==  FLT_MAX ? 100 : INT_MAX;
+	auto min = m_opt.min == INT_MIN ? 0 : m_opt.min;
+	auto max = m_opt.max == INT_MAX ? 100 : m_opt.max;
 
 	m_slider = new wxSlider(m_parent, wxID_ANY, def_val * m_scale,
 							min * m_scale, max * m_scale,
