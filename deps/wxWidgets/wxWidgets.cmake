@@ -26,6 +26,7 @@ orcaslicer_add_cmake_project(
     GIT_REPOSITORY "https://github.com/SoftFever/Orca-deps-wxWidgets"
     GIT_TAG v3.3.2
     GIT_SHALLOW ON
+    GIT_SUBMODULES 3rdparty/catch 3rdparty/pcre 3rdparty/libwebp
     DEPENDS ${PNG_PKG} ${ZLIB_PKG} ${EXPAT_PKG} ${JPEG_PKG}
     CMAKE_ARGS
         -DwxBUILD_PRECOMP=ON
@@ -52,6 +53,7 @@ orcaslicer_add_cmake_project(
         -DwxUSE_ZLIB=sys
         -DwxUSE_LIBJPEG=sys
         -DwxUSE_LIBTIFF=OFF
+        -DwxUSE_LIBWEBP=builtin
         -DwxUSE_EXPAT=sys
         -DwxUSE_NANOSVG=OFF
 )
