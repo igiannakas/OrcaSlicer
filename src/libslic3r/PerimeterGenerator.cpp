@@ -2263,7 +2263,7 @@ void PerimeterGenerator::process_no_bridge(Surfaces& all_surfaces, coord_t perim
 // Arachne varies line width to fill the region (e.g. the odd centre line of a narrow wall is wider
 // than nominal), so the touching distance is half the combined width at the closest points, not the
 // nominal spacing. Widths are taken locally so a line widened in one place (a wedge tip, a wall
-// transition) does not count as touching where it passes close by elsewhere. min_threshold keeps
+// transition) does not count as touching where it passes close to other perimeters. min_threshold keeps
 // the nominal spacing threshold as the lower bound.
 static bool arachne_lines_touch(const Arachne::ExtrusionLine &a, const Arachne::ExtrusionLine &b, double min_threshold)
 {
@@ -2293,8 +2293,8 @@ static bool arachne_lines_touch(const Arachne::ExtrusionLine &a, const Arachne::
  *
  * @param entities The list of PerimeterGeneratorArachneExtrusion entities.
  * @param referenceIndices A set of indices representing the reference points.
- * @param threshold_external The minimum touching distance for a reference perimeter with inset index 0 (see arachne_lines_touch)
- * @param threshold_internal The minimum touching distance for a reference perimeter with inset index 1+ (see arachne_lines_touch)
+ * @param threshold_external The minimum touching distance for a reference perimeter with inset index 0 
+ * @param threshold_internal The minimum touching distance for a reference perimeter with inset index 1+ 
  * @param considered_inset_idx What perimeter inset index are we searching for (eg. if we are searching for first internal perimeters proximate to the current reference perimeter, this value should be set to 1 etc).
  * @return std::vector<int> A vector of indices representing the touching perimeters.
  */
