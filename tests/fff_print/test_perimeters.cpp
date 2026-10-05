@@ -22,6 +22,7 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
 #include <limits>
 #include <string>
 #include <utility>
