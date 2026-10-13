@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -36,10 +37,12 @@
 #include <boost/filesystem.hpp>
 
 #include "libslic3r/AABBMesh.hpp"
+#include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/TextureDisplacement.hpp"
 #include "libslic3r/TextureBake/TextureBakeDecimate.hpp"
 #include "libslic3r/TextureBake/TextureBakeFlip.hpp"
 #include "libslic3r/TextureBake/TextureBakeMesh.hpp"
+#include "libslic3r/TextureBake/TextureBakeRepair.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/PNGReadWrite.hpp"
@@ -1301,6 +1304,294 @@ TEST_CASE("TextureDisplacement: the step cutter only cuts inside the region", "[
     }
 }
 
+// ---- Image adjustments (the gizmo's image-adjustment panel) ----------------------------------------
+
+// A grayscale ramp 0..255 across the width, so every input level is present exactly once per row and a
+// tonal curve can be read straight off the output.
+static DecodedHeightTexture make_gray_ramp(int w = 256, int h = 4)
+{
+    DecodedHeightTexture t;
+    t.width  = w;
+    t.height = h;
+    t.pixels.resize(size_t(w) * size_t(h));
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            t.pixels[size_t(y) * size_t(w) + size_t(x)] = uint8_t(x * 255 / std::max(1, w - 1));
+    return t;
+}
+
+// A one-texel checkerboard of 0 and 255 - the highest spatial frequency the grid can hold, which is what
+// a blur has to remove and a downscale has to average rather than drop.
+static DecodedHeightTexture make_gray_checkerboard(int w = 16, int h = 16)
+{
+    DecodedHeightTexture t;
+    t.width  = w;
+    t.height = h;
+    t.pixels.resize(size_t(w) * size_t(h));
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            t.pixels[size_t(y) * size_t(w) + size_t(x)] = ((x + y) % 2 == 0) ? 0 : 255;
+    return t;
+}
+
+static DecodedHeightTexture make_rgb_flat(uint8_t r, uint8_t g, uint8_t b, int w = 8, int h = 8)
+{
+    DecodedHeightTexture t;
+    t.width  = w;
+    t.height = h;
+    t.pixels.resize(size_t(w) * size_t(h));
+    t.rgb.resize(size_t(w) * size_t(h) * 3);
+    for (size_t i = 0; i < size_t(w) * size_t(h); ++i) {
+        t.rgb[i * 3]     = r;
+        t.rgb[i * 3 + 1] = g;
+        t.rgb[i * 3 + 2] = b;
+        t.pixels[i]      = uint8_t(std::lround(0.299 * r + 0.587 * g + 0.114 * b));
+    }
+    return t;
+}
+
+TEST_CASE("an adjustment that moves no slider returns the image unchanged", "[TextureDisplacement]")
+{
+    const DecodedHeightTexture src = make_gray_ramp();
+    const DecodedHeightTexture out = apply_texture_adjustments(src, TextureAdjustments{});
+    CHECK(out.width == src.width);
+    CHECK(out.height == src.height);
+    CHECK(out.pixels == src.pixels);
+    CHECK(TextureAdjustments{}.identity());
+}
+
+TEST_CASE("brightness reaches pure white and pure black only at the ends of its range", "[TextureDisplacement]")
+{
+    const DecodedHeightTexture src = make_gray_ramp();
+
+    TextureAdjustments up;
+    up.brightness = 1.f;
+    const DecodedHeightTexture white = apply_texture_adjustments(src, up);
+    CHECK(std::all_of(white.pixels.begin(), white.pixels.end(), [](uint8_t v) { return v == 255; }));
+
+    TextureAdjustments down;
+    down.brightness = -1.f;
+    const DecodedHeightTexture black = apply_texture_adjustments(src, down);
+    CHECK(std::all_of(black.pixels.begin(), black.pixels.end(), [](uint8_t v) { return v == 0; }));
+}
+
+TEST_CASE("brightness lifts the image without flattening it into a clipped plateau", "[TextureDisplacement]")
+{
+    // The reason brightness is a lift toward white rather than an additive offset: an offset would drive
+    // everything above mid-grey to a flat 255, and since this image is also the height map that region
+    // would bake as flat relief. Half a stop up must leave almost nothing at pure white.
+    const DecodedHeightTexture src = make_gray_ramp();
+    TextureAdjustments         adj;
+    adj.brightness = 0.5f;
+    const DecodedHeightTexture out = apply_texture_adjustments(src, adj);
+
+    REQUIRE(out.pixels.size() == src.pixels.size());
+    const size_t clipped = size_t(std::count(out.pixels.begin(), out.pixels.end(), uint8_t(255)));
+    CHECK(clipped * 100 < out.pixels.size()); // under 1%; an additive shift would clip half the ramp
+
+    // Every texel got brighter, and the curve stays ordered: brighter in means brighter out.
+    for (size_t i = 0; i < out.pixels.size(); ++i)
+        REQUIRE(out.pixels[i] >= src.pixels[i]);
+    for (int x = 1; x < out.width; ++x)
+        REQUIRE(out.pixels[size_t(x)] >= out.pixels[size_t(x - 1)]);
+}
+
+TEST_CASE("contrast at its lowest flattens the image to mid-grey and at its highest spreads it apart",
+          "[TextureDisplacement]")
+{
+    const DecodedHeightTexture src = make_gray_ramp();
+
+    TextureAdjustments flat;
+    flat.contrast = -1.f;
+    const DecodedHeightTexture grey = apply_texture_adjustments(src, flat);
+    // One value everywhere - the pivot. Which exact level that rounds to is not the point.
+    CHECK(std::adjacent_find(grey.pixels.begin(), grey.pixels.end(), std::not_equal_to<uint8_t>()) ==
+          grey.pixels.end());
+
+    TextureAdjustments hard;
+    hard.contrast = 1.f;
+    const DecodedHeightTexture split = apply_texture_adjustments(src, hard);
+    // A threshold about the pivot: the dark end of the ramp goes to black, the light end to white.
+    CHECK(split.pixels[0] == 0);
+    CHECK(split.pixels[size_t(split.width - 1)] == 255);
+}
+
+TEST_CASE("blur removes the finest detail and sharpness exaggerates an edge", "[TextureDisplacement]")
+{
+    // Blur: a one-texel checkerboard is the highest frequency the grid holds, so a blur has to collapse it
+    // toward its own mean. Measured as mean absolute deviation, which needs no assumption about the mean.
+    const DecodedHeightTexture checker = make_gray_checkerboard(32, 32);
+    const auto                 deviation = [](const DecodedHeightTexture &t) {
+        double mean = 0.;
+        for (uint8_t v : t.pixels)
+            mean += double(v);
+        mean /= double(t.pixels.size());
+        double dev = 0.;
+        for (uint8_t v : t.pixels)
+            dev += std::abs(double(v) - mean);
+        return dev / double(t.pixels.size());
+    };
+    TextureAdjustments blur;
+    blur.blur = 1.f;
+    CHECK(deviation(apply_texture_adjustments(checker, blur)) < 0.25 * deviation(checker));
+
+    // Sharpness: an unsharp mask pushes each side of a step further from the other, so the step
+    // overshoots - darker than the dark side just inside it, brighter than the bright side just inside.
+    DecodedHeightTexture step;
+    step.width  = 64;
+    step.height = 8;
+    step.pixels.assign(size_t(step.width) * size_t(step.height), 100);
+    for (int y = 0; y < step.height; ++y)
+        for (int x = step.width / 2; x < step.width; ++x)
+            step.pixels[size_t(y) * size_t(step.width) + size_t(x)] = 150;
+
+    TextureAdjustments sharp;
+    sharp.sharpness = 1.f;
+    const DecodedHeightTexture sharpened = apply_texture_adjustments(step, sharp);
+    const size_t               row       = size_t(step.height / 2) * size_t(step.width);
+    const size_t               mid       = size_t(step.width / 2);
+    CHECK(sharpened.pixels[row + mid - 1] < 100); // undershoot on the dark side of the step
+    CHECK(sharpened.pixels[row + mid] > 150);     // overshoot on the light side
+}
+
+TEST_CASE("a grayscale image stays grayscale and its hue slider does nothing", "[TextureDisplacement]")
+{
+    const DecodedHeightTexture src = make_gray_ramp();
+    REQUIRE_FALSE(src.has_color());
+
+    TextureAdjustments hue;
+    hue.hue_deg = 120.f;
+    const DecodedHeightTexture out = apply_texture_adjustments(src, hue);
+    // Not promoted to RGB: a grey image has no colour to offer the layer's colour feature, and storing it
+    // as RGB would triple the PNG for a row of identical greys.
+    CHECK_FALSE(out.has_color());
+    CHECK(out.rgb.empty());
+    CHECK(out.pixels == src.pixels);
+}
+
+TEST_CASE("a colour image's height stays the luminance of its adjusted colour", "[TextureDisplacement]")
+{
+    // The invariant that keeps the relief and the colour from drifting apart: whatever the adjustment did
+    // to the channels, the height is recomputed from the channels that came out.
+    const DecodedHeightTexture src = make_rgb_flat(200, 60, 30);
+    REQUIRE(src.has_color());
+
+    TextureAdjustments adj;
+    adj.brightness = 0.2f;
+    adj.contrast   = 0.3f;
+    adj.hue_deg    = 75.f;
+    const DecodedHeightTexture out = apply_texture_adjustments(src, adj);
+    REQUIRE(out.has_color());
+
+    for (size_t i = 0; i < out.pixels.size(); ++i) {
+        const long expect = std::lround(0.299 * out.rgb[i * 3] + 0.587 * out.rgb[i * 3 + 1] +
+                                        0.114 * out.rgb[i * 3 + 2]);
+        REQUIRE(long(out.pixels[i]) == expect);
+    }
+    // The hue turn actually moved the colour, so the check above is not passing on an unchanged image.
+    CHECK(out.rgb != src.rgb);
+}
+
+TEST_CASE("a full turn of the hue leaves a colour where it started", "[TextureDisplacement]")
+{
+    const DecodedHeightTexture src = make_rgb_flat(200, 60, 30);
+    TextureAdjustments         adj;
+    adj.hue_deg                    = 360.f;
+    const DecodedHeightTexture out = apply_texture_adjustments(src, adj);
+    REQUIRE(out.has_color());
+    // Rounding through 8-bit channels, so a level or two of slack rather than exact equality.
+    for (size_t i = 0; i < out.rgb.size(); ++i)
+        REQUIRE(std::abs(int(out.rgb[i]) - int(src.rgb[i])) <= 2);
+}
+
+TEST_CASE("the adjustment blur radius ramps from zero and stays under its cost cap", "[TextureDisplacement]")
+{
+    CHECK_THAT(adjustment_blur_radius(0.f, 512, 512), Catch::Matchers::WithinAbs(0.f, 1e-6f));
+    // 5% of the short side, as the Smoothing slider uses.
+    CHECK_THAT(adjustment_blur_radius(1.f, 512, 512), Catch::Matchers::WithinAbs(25.6f, 1e-3f));
+    CHECK_THAT(adjustment_blur_radius(0.5f, 512, 512), Catch::Matchers::WithinAbs(12.8f, 1e-3f));
+    // Capped, so a large image at the top of the slider cannot cost without bound.
+    CHECK_THAT(adjustment_blur_radius(1.f, 8192, 8192), Catch::Matchers::WithinAbs(48.f, 1e-3f));
+    // Sized off the short side, not the long one.
+    CHECK_THAT(adjustment_blur_radius(1.f, 4096, 200), Catch::Matchers::WithinAbs(10.f, 1e-3f));
+}
+
+TEST_CASE("downscaling a height texture averages the texels it drops and never upscales",
+          "[TextureDisplacement]")
+{
+    // Averaging, not decimation: a one-texel checkerboard halved must come out uniformly mid-grey. Picking
+    // one texel per block would instead come out all black or all white - detail the adjustment never
+    // produced, shown in the preview.
+    const DecodedHeightTexture small = downscale_height_texture(make_gray_checkerboard(16, 16), 8);
+    CHECK(small.width == 8);
+    CHECK(small.height == 8);
+    CHECK(std::all_of(small.pixels.begin(), small.pixels.end(), [](uint8_t v) { return v == 127; }));
+
+    // Already within the limit: handed back as it is.
+    const DecodedHeightTexture ramp = make_gray_ramp(64, 4);
+    const DecodedHeightTexture same = downscale_height_texture(ramp, 256);
+    CHECK(same.width == ramp.width);
+    CHECK(same.height == ramp.height);
+    CHECK(same.pixels == ramp.pixels);
+
+    // Aspect preserved, and a colour source keeps its colour.
+    const DecodedHeightTexture wide = downscale_height_texture(make_rgb_flat(200, 60, 30, 400, 100), 100);
+    CHECK(wide.width == 100);
+    CHECK(wide.height == 25);
+    CHECK(wide.has_color());
+}
+
+TEST_CASE("a layer's live image adjustment reaches its decode", "[TextureDisplacement]")
+{
+    // This is what makes the image-adjustment panel's sliders move the relief: decode_height_texture()
+    // applies the layer's preview_adjust, so everything downstream of the decode - the displacement, the
+    // colour, the thumbnails, the bake - sees the adjusted image without being told about the panel.
+    TextureDisplacementLayer layer;
+    layer.image_data = make_checkerboard_png(32, 32);
+
+    const DecodedHeightTexture raw = decode_height_texture(layer);
+    REQUIRE_FALSE(raw.empty());
+
+    // An untouched panel, and a closed one, cost nothing and change nothing.
+    layer.preview_adjust = TextureAdjustments{};
+    CHECK(decode_height_texture(layer).pixels == raw.pixels);
+
+    layer.preview_adjust.brightness = 0.5f;
+    const DecodedHeightTexture bright = decode_height_texture(layer);
+    CHECK(bright.pixels != raw.pixels);
+    CHECK(bright.pixels == apply_texture_adjustments(raw, layer.preview_adjust).pixels);
+
+    // Back to identity gives the stored image back, so closing the panel really does revert the layer.
+    layer.preview_adjust = TextureAdjustments{};
+    CHECK(decode_height_texture(layer).pixels == raw.pixels);
+}
+
+TEST_CASE("changing a live adjustment is not served the previous one from cache", "[TextureDisplacement]")
+{
+    // The decode caches by the image_data pointer, which does not change while a slider moves - so the
+    // adjustment has to be part of the key or every slider move past the first would redraw the same
+    // pixels. Same for the smoothed copy, which is computed on top of the adjusted one.
+    TextureDisplacementLayer layer;
+    layer.image_data = make_checkerboard_png(32, 32);
+    const DecodedHeightTexture raw = decode_height_texture(layer);
+    REQUIRE_FALSE(raw.empty());
+
+    layer.preview_adjust.brightness = 0.5f;
+    const std::vector<uint8_t> bright = decode_height_texture(layer).pixels;
+    layer.preview_adjust.brightness   = -0.5f;
+    const std::vector<uint8_t> dark   = decode_height_texture(layer).pixels;
+    CHECK(bright != dark);
+    CHECK(dark == apply_texture_adjustments(raw, layer.preview_adjust).pixels);
+
+    // The same question again with smoothing on, which is cached separately and keyed by both.
+    layer.smoothing                 = 0.5f;
+    layer.preview_adjust.brightness = 0.5f;
+    const std::vector<uint8_t> smooth_bright = decode_height_texture(layer).pixels;
+    layer.preview_adjust.brightness          = -0.5f;
+    const std::vector<uint8_t> smooth_dark   = decode_height_texture(layer).pixels;
+    CHECK(smooth_bright != smooth_dark);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Texture smoothing
 // ---------------------------------------------------------------------------------------------
@@ -2419,6 +2710,157 @@ TEST_CASE("Cancelling while flat faces are harvested past the budget stops the d
     CHECK(canceled > full);
 }
 
+TEST_CASE("Baking twice keeps the mesh closed and carries the first bake's colours across",
+          "[TextureDisplacement][Regression]")
+{
+    // Bake, colour part of what came back, bake again. The one-run pipeline rebuilds the topology, so
+    // the colour recorded against the first bake's mesh indexes triangles that no longer mean the same
+    // thing. Taken across by triangle id it lands on unrelated faces - a bake almost always grows the
+    // triangle count, so every stale id passes the only bound check deserialize() makes - which both
+    // scatters colour over surfaces nothing painted and destroys what the first pass laid down.
+    // transfer_facet_paint() carries it across by position instead - every triangle of the new mesh
+    // takes the state painted at its foot point on the old one - which is what makes successive bakes
+    // accumulate. See TextureDisplacementBakeJob, which is where the two meet.
+    constexpr float            side    = 20.f;
+    constexpr float            refine  = 0.5f;
+    constexpr float            radius  = 4.f;
+    const indexed_triangle_set cube    = its_make_cube(side, side, side);
+    const Vec2f                first_stroke(6.f, 6.f), second_stroke(14.f, 14.f);
+
+    TextureDisplacementLayer layer;
+    layer.slot          = 0;
+    layer.image_data    = make_rgb_png_2x2();
+    layer.tiling_scale  = 5.f;
+    layer.depth_mm      = 0.5f;
+    layer.color_enabled = true;
+
+    TextureDisplacementOptions options;
+    options.pipeline_v2        = true;
+    options.v2_refine_mm       = refine;
+    options.v2_max_triangles_k = 750;
+
+    // Three primaries, so a palette entry is legible in the assertions below.
+    const std::array<Vec3f, 3> palette = { Vec3f(1, 0, 0), Vec3f(0, 1, 0), Vec3f(0, 0, 1) };
+    TextureColorRequest        request;
+    request.quantize = [&palette](const Vec3f &rgb) {
+        int   best = 0;
+        float bd   = std::numeric_limits<float>::max();
+        for (int i = 0; i < 3; ++i)
+            if (const float d = (palette[size_t(i)] - rgb).squaredNorm(); d < bd) { bd = d; best = i; }
+        return best;
+    };
+
+    const auto bake = [&](const indexed_triangle_set &mesh, const Vec2f &stroke, std::vector<uint8_t> &color) {
+        TextureDisplacementFacetsData facets;
+        facets[0] = paint_top_disc(mesh, side, stroke, radius);
+        TextureColorRequest req = request;
+        req.out_triangle        = &color;
+        return build_texture_displacement(mesh, { layer }, facets, options, {}, &req);
+    };
+    // The pipeline's own counters, over welded positions, so a mesh watertight only after welding
+    // still reads as closed.
+    const auto defects = [](const indexed_triangle_set &mesh) {
+        return TextureBake::count_edge_defects(TextureBake::to_soup(mesh));
+    };
+
+    std::vector<uint8_t>       color1;
+    const indexed_triangle_set first = bake(cube, first_stroke, color1);
+    REQUIRE(first.indices.size() > cube.indices.size());
+    REQUIRE(color1.size() == first.indices.size());
+    const TextureBake::EdgeDefects d1 = defects(first);
+    INFO("first bake: " << d1.triangles << " triangles, " << d1.open << " open, " << d1.non_manifold << " non-manifold");
+    CHECK(d1.open == 0);
+    CHECK(d1.non_manifold == 0);
+
+    // The colour the first bake committed, as TextureDisplacementBakeJob writes it.
+    TriangleSelector::TriangleSplittingData painted_first;
+    {
+        const TriangleMesh mesh(first);
+        TriangleSelector   selector(mesh);
+        for (size_t i = 0; i < color1.size(); ++i)
+            if (color1[i] != 0)
+                selector.set_facet(int(i), EnforcerBlockerType(color1[i]));
+        painted_first = selector.serialize();
+    }
+    REQUIRE_FALSE(painted_first.bitstream.empty());
+
+    std::vector<uint8_t>       color2;
+    const indexed_triangle_set second = bake(first, second_stroke, color2);
+    REQUIRE(color2.size() == second.indices.size());
+    REQUIRE(second.indices.size() != first.indices.size()); // the topology really did change
+    const TextureBake::EdgeDefects d2 = defects(second);
+    INFO("second bake: " << d2.triangles << " triangles, " << d2.open << " open, " << d2.non_manifold << " non-manifold");
+    CHECK(d2.open == 0);
+    CHECK(d2.non_manifold == 0);
+
+    // The commit: the earlier colour carried onto the new topology, this bake's own colour over it.
+    std::vector<uint8_t> committed(second.indices.size(), 0);
+    {
+        const TriangleMesh mesh(second);
+        TriangleSelector   selector(mesh);
+        const std::vector<uint8_t> carried = transfer_facet_paint(first, painted_first, second);
+        REQUIRE(carried.size() == second.indices.size());
+        for (size_t i = 0; i < carried.size(); ++i)
+            if (carried[i] != 0)
+                selector.set_facet(int(i), EnforcerBlockerType(carried[i]));
+        for (size_t i = 0; i < color2.size(); ++i)
+            if (color2[i] != 0)
+                selector.set_facet(int(i), EnforcerBlockerType(color2[i]));
+        for (int state = 1; state <= int(palette.size()); ++state) {
+            std::vector<int> src;
+            if (selector.get_facets_strict(EnforcerBlockerType(state), &src).indices.empty())
+                continue;
+            for (const int s : src)
+                if (s >= 0 && size_t(s) < committed.size() && committed[size_t(s)] == 0)
+                    committed[size_t(s)] = uint8_t(state);
+        }
+    }
+
+    // Just the triangles the first bake coloured, to ask "how far is this from colour that was really
+    // laid down" of anything the commit painted.
+    indexed_triangle_set coloured_first;
+    coloured_first.vertices = first.vertices;
+    for (size_t i = 0; i < color1.size(); ++i)
+        if (color1[i] != 0)
+            coloured_first.indices.push_back(first.indices[i]);
+    const AABBTreeIndirect::Tree3f tree = AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(
+        coloured_first.vertices, coloured_first.indices);
+
+    // A triangle may carry colour the second bake did not produce only where the first bake's colour
+    // actually was. A foot point sits on the surface the bake started from, which the relief has since
+    // moved, and the transfer can widen the region by a triangle, so the margin is twice the edge
+    // length the bake was told to refine to; landing anywhere else means the mask was read against a
+    // mesh it no longer matches.
+    size_t own = 0, carried_over = 0, stranded = 0;
+    float  worst = 0.f;
+    for (size_t i = 0; i < second.indices.size(); ++i) {
+        if (committed[i] == 0)
+            continue;
+        if (i < color2.size() && color2[i] != 0) {
+            CHECK(committed[i] == color2[i]); // this bake's own colour wins where it painted
+            ++own;
+            continue;
+        }
+        const stl_triangle_vertex_indices &t = second.indices[i];
+        const Vec3f g = (second.vertices[size_t(t[0])] + second.vertices[size_t(t[1])] +
+                         second.vertices[size_t(t[2])]) / 3.f;
+        size_t      hit = 0;
+        Vec3f       foot;
+        const float d = std::sqrt(std::max(0.f, AABBTreeIndirect::squared_distance_to_indexed_triangle_set(
+                                                    coloured_first.vertices, coloured_first.indices, tree, g, hit, foot)));
+        worst = std::max(worst, d);
+        if (d <= 2.f * refine)
+            ++carried_over;
+        else
+            ++stranded;
+    }
+    INFO("committed: " << own << " from this bake, " << carried_over << " carried over, " << stranded
+                       << " stranded, worst distance from the first bake's colour " << worst << " mm");
+    CHECK(own > 0);
+    CHECK(carried_over > 0);   // the first bake's colour survived the second
+    CHECK(stranded == 0);      // and nothing was painted where neither bake put colour
+}
+
 TEST_CASE("A second bake beside a first comes out as fine as a single bake", "[TextureDisplacement]")
 {
     // A stroke in each of the cube's two top triangles, baked one after the other. The first bake used
@@ -2660,4 +3102,354 @@ TEST_CASE("whether a layer's texture has colour agrees with its decode", "[Textu
     CHECK(height_texture_has_color(color));
 
     CHECK_FALSE(height_texture_has_color(TextureDisplacementLayer{}));
+}
+
+// ---------------------------------------------------------------------------------------------
+// The model's own UV channel, and the Override blend mode
+// ---------------------------------------------------------------------------------------------
+
+// A grayscale image that is black in its left half and white in its right half, so where a sample
+// lands along u is readable straight off the height it comes back with.
+static std::shared_ptr<std::vector<unsigned char>> make_left_right_split_png(size_t w = 16, size_t h = 16)
+{
+    std::vector<uint8_t> pixels(w * h);
+    for (size_t y = 0; y < h; ++y)
+        for (size_t x = 0; x < w; ++x)
+            pixels[y * w + x] = (x < w / 2) ? 0 : 255;
+    const boost::filesystem::path tmp_path = boost::filesystem::temp_directory_path()
+        / boost::filesystem::unique_path("texdisp_test_%%%%%%%%.png");
+    REQUIRE(Slic3r::png::write_gray_to_file(tmp_path.string(), w, h, pixels));
+
+    std::vector<unsigned char> bytes;
+    {
+        std::ifstream ifs(tmp_path.string(), std::ios::binary);
+        bytes.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+    }
+    boost::system::error_code ec;
+    boost::filesystem::remove(tmp_path, ec);
+
+    REQUIRE_FALSE(bytes.empty());
+    return std::make_shared<std::vector<unsigned char>>(std::move(bytes));
+}
+
+// Where a sheet coordinate lands in uv: across [UV_LO, UV_LO + UV_SPAN] rather than the full [0, 1].
+// The inset keeps the tests off the exact edge of an untiled placement, where there is deliberately no
+// texture at all rather than its border texel (see DecodedHeightTexture::sample()) - a real model's
+// channel does reach 1.0, and a vertex sitting exactly there displaces by nothing on purpose.
+static constexpr float UV_LO   = 0.1f;
+static constexpr float UV_SPAN = 0.8f;
+
+static float sheet_uv_at(float coord, float size, bool mirror = false)
+{
+    const float t = coord / size;
+    return UV_LO + UV_SPAN * (mirror ? 1.f - t : t);
+}
+
+// One UV per triangle corner: u follows x, v follows y. `mirror_u` mirrors u, which is what the tests
+// use to show the bake is really reading the channel rather than projecting the position.
+static std::vector<Vec2f> sheet_uv_channel(const indexed_triangle_set &sheet, float size, bool mirror_u = false)
+{
+    std::vector<Vec2f> uv(sheet.indices.size() * 3);
+    for (size_t f = 0; f < sheet.indices.size(); ++f)
+        for (int k = 0; k < 3; ++k) {
+            const Vec3f &p = sheet.vertices[size_t(sheet.indices[f][k])];
+            uv[f * 3 + size_t(k)] = Vec2f(sheet_uv_at(p.x(), size, mirror_u), sheet_uv_at(p.y(), size));
+        }
+    return uv;
+}
+
+TEST_CASE("Override blend replaces the displacement under it instead of combining with it",
+          "[TextureDisplacement]")
+{
+    CHECK_THAT(blend_displacement(3.f, 1.f, TextureBlendMode::Override), WithinAbs(1.f, 1e-6f));
+    // Nothing underneath yet is still just the value, so an Override layer at the bottom of the
+    // stack behaves exactly like the Add the bake forces there.
+    CHECK_THAT(blend_displacement(0.f, 1.f, TextureBlendMode::Override), WithinAbs(1.f, 1e-6f));
+    // The sign carries, and a zero sample really does flatten what is under it - that is the point.
+    CHECK_THAT(blend_displacement(3.f, -1.f, TextureBlendMode::Override), WithinAbs(-1.f, 1e-6f));
+    CHECK_THAT(blend_displacement(3.f, 0.f, TextureBlendMode::Override), WithinAbs(0.f, 1e-6f));
+}
+
+TEST_CASE("an Override layer leaves only its own relief where two layers overlap", "[TextureDisplacement]")
+{
+    const indexed_triangle_set cube = its_make_cube(10., 10., 10.);
+
+    TextureDisplacementLayer base;
+    base.slot         = 0;
+    base.depth_mm     = 2.0f;
+    base.tiling_scale = 5.0f;
+    base.image_data   = make_flat_gray_png(255); // full depth everywhere
+
+    TextureDisplacementLayer second = base;
+    second.slot       = 1;
+    second.depth_mm   = 0.5f;
+    second.blend_mode = TextureBlendMode::Override;
+
+    TextureDisplacementFacetsData facets{};
+    facets[0] = paint_whole_mesh(cube);
+    facets[1] = facets[0];
+
+    const indexed_triangle_set overridden = build_texture_displacement(cube, {base, second}, facets, classic_options());
+    REQUIRE(overridden.vertices.size() == cube.vertices.size());
+
+    // Add would have piled the two up to 2.5 mm; Override keeps the upper layer's 0.5 mm alone.
+    TextureDisplacementLayer added = second;
+    added.blend_mode               = TextureBlendMode::Add;
+    const indexed_triangle_set summed = build_texture_displacement(cube, {base, added}, facets, classic_options());
+    REQUIRE(summed.vertices.size() == cube.vertices.size());
+
+    for (size_t i = 0; i < cube.vertices.size(); ++i) {
+        if (!above_resting_plane(cube, i))
+            continue;
+        CHECK_THAT((overridden.vertices[i] - cube.vertices[i]).norm(), WithinAbs(0.5f, 1e-3f));
+        CHECK_THAT((summed.vertices[i] - cube.vertices[i]).norm(), WithinAbs(2.5f, 1e-3f));
+    }
+}
+
+TEST_CASE("the ModelUV mapping displaces through the model's own UV channel", "[TextureDisplacement]")
+{
+    constexpr float            size  = 10.f;
+    const indexed_triangle_set sheet = make_flat_sheet(size, 1.f);
+
+    TextureDisplacementLayer layer;
+    layer.slot         = 0;
+    layer.depth_mm     = 1.0f;
+    layer.image_data   = make_left_right_split_png();
+    layer.tile_enabled = false; // the layout is the placement; nothing should repeat
+    layer.projection_method = TextureProjectionMethod::ModelUV;
+
+    TextureDisplacementFacetsData facets{};
+    facets[0] = paint_whole_mesh(sheet);
+
+    const std::vector<Vec2f> uv      = sheet_uv_channel(sheet, size);
+    const std::vector<Vec2f> flipped = sheet_uv_channel(sheet, size, /* mirror_u */ true);
+
+    const indexed_triangle_set out = build_texture_displacement(sheet, {layer}, facets, classic_options(), {}, nullptr,
+                                                                 Transform3d::Identity(), nullptr, nullptr, &uv);
+    REQUIRE(out.vertices.size() == sheet.vertices.size());
+
+    // The image is black for u < 0.5 and white above it, and the channel's u rises with x across the
+    // sheet, so it comes out flat on its left half and raised by the full depth on its right.
+    size_t low = 0, high = 0;
+    for (size_t i = 0; i < sheet.vertices.size(); ++i) {
+        const float x    = sheet.vertices[i].x();
+        const float dz   = out.vertices[i].z() - sheet.vertices[i].z();
+        if (x < 0.4f * size) {
+            CHECK_THAT(dz, WithinAbs(0.f, 1e-3f));
+            ++low;
+        } else if (x > 0.6f * size) {
+            CHECK_THAT(dz, WithinAbs(layer.depth_mm, 1e-3f));
+            ++high;
+        }
+    }
+    REQUIRE(low > 0);
+    REQUIRE(high > 0);
+
+    // Mirroring the channel mirrors the relief: the mapping really is the channel's, not a planar
+    // projection of the position (which would be unchanged by it).
+    const indexed_triangle_set mirrored = build_texture_displacement(sheet, {layer}, facets, classic_options(), {},
+                                                                      nullptr, Transform3d::Identity(), nullptr, nullptr,
+                                                                      &flipped);
+    REQUIRE(mirrored.vertices.size() == sheet.vertices.size());
+    for (size_t i = 0; i < sheet.vertices.size(); ++i) {
+        const float x = sheet.vertices[i].x();
+        if (x < 0.4f * size)
+            CHECK_THAT(mirrored.vertices[i].z() - sheet.vertices[i].z(), WithinAbs(layer.depth_mm, 1e-3f));
+        else if (x > 0.6f * size)
+            CHECK_THAT(mirrored.vertices[i].z() - sheet.vertices[i].z(), WithinAbs(0.f, 1e-3f));
+    }
+}
+
+TEST_CASE("a ModelUV layer falls back to Triplanar when the volume carries no UV channel",
+          "[TextureDisplacement]")
+{
+    constexpr float            size  = 10.f;
+    const indexed_triangle_set sheet = make_flat_sheet(size, 2.f);
+
+    TextureDisplacementLayer layer;
+    layer.slot         = 0;
+    layer.depth_mm     = 1.0f;
+    layer.tiling_scale = 5.0f;
+    layer.image_data   = make_flat_gray_png(255);
+
+    TextureDisplacementFacetsData facets{};
+    facets[0] = paint_whole_mesh(sheet);
+
+    layer.projection_method                 = TextureProjectionMethod::Triplanar;
+    const indexed_triangle_set as_triplanar = build_texture_displacement(sheet, {layer}, facets, classic_options());
+    layer.projection_method                 = TextureProjectionMethod::ModelUV;
+    const indexed_triangle_set no_channel    = build_texture_displacement(sheet, {layer}, facets, classic_options());
+
+    REQUIRE(no_channel.vertices.size() == as_triplanar.vertices.size());
+    for (size_t i = 0; i < as_triplanar.vertices.size(); ++i)
+        CHECK_THAT((no_channel.vertices[i] - as_triplanar.vertices[i]).norm(), WithinAbs(0.f, 1e-5f));
+}
+
+TEST_CASE("a bake with colour off on every layer reports no colour at all", "[TextureDisplacement]")
+{
+    const indexed_triangle_set cube = its_make_cube(10., 10., 10.);
+
+    TextureDisplacementLayer layer;
+    layer.slot          = 0;
+    layer.depth_mm      = 1.0f;
+    layer.tiling_scale  = 5.0f;
+    layer.image_data    = make_flat_rgb_png(200, 40, 10); // has colour to give...
+    layer.color_enabled = false;                          // ...but is not asked for it
+
+    TextureDisplacementFacetsData facets{};
+    facets[0] = paint_whole_mesh(cube);
+
+    std::vector<uint8_t> triangle_color;
+    TextureColorRequest  request;
+    request.quantize     = [](const Vec3f &) { return 0; }; // would colour everything, if asked
+    request.out_triangle = &triangle_color;
+
+    const indexed_triangle_set out = build_texture_displacement(cube, {layer}, facets, classic_options(), {}, &request);
+    REQUIRE_FALSE(out.vertices.empty());
+    // Every entry 0 ("this triangle takes no colour from the texture"), so the commit leaves whatever
+    // the model was already painted with exactly as it was.
+    for (const uint8_t entry : triangle_color)
+        CHECK(entry == 0);
+}
+
+TEST_CASE("transfer_uv_channel resamples a UV channel onto a subdivided copy of the same surface",
+          "[TextureDisplacement]")
+{
+    constexpr float            size   = 10.f;
+    const indexed_triangle_set coarse = make_flat_sheet(size, 5.f);
+    const indexed_triangle_set fine   = make_flat_sheet(size, 1.f);
+    const std::vector<Vec2f>   uv     = sheet_uv_channel(coarse, size);
+
+    const std::vector<Vec2f> moved = transfer_uv_channel(coarse, uv, fine);
+    REQUIRE(moved.size() == fine.indices.size() * 3);
+
+    // The channel is affine in position here (u = x/size, v = y/size), so a correct transfer
+    // reproduces it exactly at every corner of the finer mesh.
+    for (size_t f = 0; f < fine.indices.size(); ++f)
+        for (int k = 0; k < 3; ++k) {
+            const Vec3f &p = fine.vertices[size_t(fine.indices[f][k])];
+            CHECK_THAT(moved[f * 3 + size_t(k)].x(), WithinAbs(sheet_uv_at(p.x(), size), 1e-4f));
+            CHECK_THAT(moved[f * 3 + size_t(k)].y(), WithinAbs(sheet_uv_at(p.y(), size), 1e-4f));
+        }
+
+    // A mismatched channel is refused rather than read past its end.
+    CHECK(transfer_uv_channel(coarse, {Vec2f::Zero()}, fine).empty());
+    CHECK(transfer_uv_channel(coarse, uv, indexed_triangle_set{}).empty());
+}
+
+TEST_CASE("the model's per-corner UVs survive a brush split and collapse to one per vertex",
+          "[TextureDisplacement]")
+{
+    constexpr float            size  = 10.f;
+    const indexed_triangle_set sheet = make_flat_sheet(size, 5.f);
+    const std::vector<Vec2f>   uv    = sheet_uv_channel(sheet, size);
+
+    // The whole sheet as a patch, with the source map the channel is read through.
+    const TriangleMesh tm(sheet);
+    TriangleSelector   selector(tm);
+    for (int f = 0; f < int(sheet.indices.size()); ++f)
+        selector.set_facet(f, EnforcerBlockerType::ENFORCER);
+    std::vector<int>           source;
+    const indexed_triangle_set patch = selector.get_facets_strict(EnforcerBlockerType::ENFORCER, &source);
+    REQUIRE(patch.indices.size() == source.size());
+
+    const std::vector<Vec2f> corner = compute_model_corner_uvs(sheet, uv, patch, source);
+    REQUIRE(corner.size() == patch.indices.size() * 3);
+    // An unsplit patch triangle *is* its source triangle, so its corners reproduce the channel.
+    for (size_t f = 0; f < patch.indices.size(); ++f)
+        for (int k = 0; k < 3; ++k) {
+            const Vec3f &p = patch.vertices[size_t(patch.indices[f][k])];
+            CHECK_THAT(corner[f * 3 + size_t(k)].x(), WithinAbs(sheet_uv_at(p.x(), size), 1e-4f));
+            CHECK_THAT(corner[f * 3 + size_t(k)].y(), WithinAbs(sheet_uv_at(p.y(), size), 1e-4f));
+        }
+
+    const std::vector<Vec2f> per_vertex = collapse_corner_uvs(patch, corner);
+    REQUIRE(per_vertex.size() == patch.vertices.size());
+    for (size_t i = 0; i < patch.vertices.size(); ++i) {
+        CHECK_THAT(per_vertex[i].x(), WithinAbs(sheet_uv_at(patch.vertices[i].x(), size), 1e-4f));
+        CHECK_THAT(per_vertex[i].y(), WithinAbs(sheet_uv_at(patch.vertices[i].y(), size), 1e-4f));
+    }
+
+    // Mismatched inputs report nothing rather than guessing.
+    CHECK(compute_model_corner_uvs(sheet, {Vec2f::Zero()}, patch, source).empty());
+    CHECK(compute_model_corner_uvs(sheet, uv, patch, {}).empty());
+    CHECK(collapse_corner_uvs(patch, {Vec2f::Zero()}).empty());
+}
+
+TEST_CASE("facet paint is carried onto a rebuilt mesh by each facet's foot point", "[TextureDisplacement]")
+{
+    constexpr float            size   = 10.f;
+    const indexed_triangle_set coarse = make_flat_sheet(size, 2.5f);
+
+    // Two filaments, split down the middle - the pattern the transfer has to reproduce.
+    const TriangleMesh coarse_mesh(coarse);
+    TriangleSelector   painter(coarse_mesh);
+    for (size_t t = 0; t < coarse.indices.size(); ++t) {
+        const stl_triangle_vertex_indices &tri = coarse.indices[t];
+        const float x = (coarse.vertices[size_t(tri[0])].x() + coarse.vertices[size_t(tri[1])].x() +
+                         coarse.vertices[size_t(tri[2])].x()) / 3.f;
+        painter.set_facet(int(t), x < 0.5f * size ? EnforcerBlockerType::Extruder1 : EnforcerBlockerType::Extruder2);
+    }
+    const TriangleSelector::TriangleSplittingData paint = painter.serialize();
+
+    // A finer mesh, lifted clear of the original surface the way a bake's relief lifts it. This is
+    // what ModelVolume::restore_painting()'s 0.01 mm overlap remap cannot follow.
+    indexed_triangle_set lifted = make_flat_sheet(size, 1.f);
+    for (Vec3f &v : lifted.vertices)
+        v.z() += 0.5f;
+
+    const std::vector<uint8_t> state = transfer_facet_paint(coarse, paint, lifted);
+    REQUIRE(state.size() == lifted.indices.size());
+
+    size_t left = 0, right = 0;
+    for (size_t t = 0; t < lifted.indices.size(); ++t) {
+        const stl_triangle_vertex_indices &tri = lifted.indices[t];
+        const float x = (lifted.vertices[size_t(tri[0])].x() + lifted.vertices[size_t(tri[1])].x() +
+                         lifted.vertices[size_t(tri[2])].x()) / 3.f;
+        // Only away from the split: a facet straddling it may legitimately land on either side.
+        if (x < 0.4f * size) {
+            CHECK(state[t] == uint8_t(EnforcerBlockerType::Extruder1));
+            ++left;
+        } else if (x > 0.6f * size) {
+            CHECK(state[t] == uint8_t(EnforcerBlockerType::Extruder2));
+            ++right;
+        }
+    }
+    REQUIRE(left > 0);
+    REQUIRE(right > 0);
+
+    // An unpainted source has nothing to carry, which is not the same as carrying NONE everywhere:
+    // the caller has to tell those apart to decide between resetting the annotation and writing one.
+    CHECK(transfer_facet_paint(coarse, TriangleSelector::TriangleSplittingData{}, lifted).empty());
+    CHECK(transfer_facet_paint(coarse, paint, indexed_triangle_set{}).empty());
+}
+
+TEST_CASE("an unpainted part of the source carries no paint onto the rebuilt mesh", "[TextureDisplacement]")
+{
+    constexpr float            size   = 10.f;
+    const indexed_triangle_set coarse = make_flat_sheet(size, 2.5f);
+
+    // Only the left half is painted at all; the right half must come back NONE rather than borrowing
+    // the nearest painted colour from across the model.
+    const TriangleMesh coarse_mesh(coarse);
+    TriangleSelector   painter(coarse_mesh);
+    for (size_t t = 0; t < coarse.indices.size(); ++t) {
+        const stl_triangle_vertex_indices &tri = coarse.indices[t];
+        const float x = (coarse.vertices[size_t(tri[0])].x() + coarse.vertices[size_t(tri[1])].x() +
+                         coarse.vertices[size_t(tri[2])].x()) / 3.f;
+        if (x < 0.5f * size)
+            painter.set_facet(int(t), EnforcerBlockerType::Extruder3);
+    }
+
+    const std::vector<uint8_t> state = transfer_facet_paint(coarse, painter.serialize(), coarse);
+    REQUIRE(state.size() == coarse.indices.size());
+    for (size_t t = 0; t < coarse.indices.size(); ++t) {
+        const stl_triangle_vertex_indices &tri = coarse.indices[t];
+        const float x = (coarse.vertices[size_t(tri[0])].x() + coarse.vertices[size_t(tri[1])].x() +
+                         coarse.vertices[size_t(tri[2])].x()) / 3.f;
+        if (x < 0.4f * size)
+            CHECK(state[t] == uint8_t(EnforcerBlockerType::Extruder3));
+        else if (x > 0.6f * size)
+            CHECK(state[t] == uint8_t(EnforcerBlockerType::NONE));
+    }
 }
