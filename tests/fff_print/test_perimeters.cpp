@@ -1316,17 +1316,42 @@ Print &collar_slab(Print &print, Model &model, const DynamicPrintConfig &config)
     return print;
 }
 
+// A 6mm radius cup, 3mm tall, with a 2mm wall and a 1.2mm floor. On the floor's last layer the cup's wall is a band
+// beside the floor's top surface, wide enough for three walls inside the cup's outer wall.
+Print &floored_cup(Print &print, Model &model, const DynamicPrintConfig &config)
+{
+    ModelObject *object = model.add_object();
+    object->name = "floored_cup.stl";
+    object->add_volume(make_cylinder(6., 3.), ModelVolumeType::MODEL_PART, false);
+    TriangleMesh inside = make_cylinder(4., 3.);
+    inside.translate(0.f, 0.f, 1.2f);
+    object->add_volume(std::move(inside), ModelVolumeType::NEGATIVE_VOLUME, false);
+    object->add_instance();
+    object->ensure_on_bed();
+
+    print.auto_assign_extruders(object);
+    print.apply(model, config);
+    print.validate();
+    print.set_status_silent();
+    print.process();
+    return print;
+}
+
 } // namespace
 
-// With only one wall on top and no top surface expansion, the inner walls of the slab's last layer are generated in the
-// band left beside the top surface, starting from both of its edges. The wall along the top surface is still the third
-// wall from the hole, so Inner/Outer/Inner prints it before the hole's outer wall, and the wall touching the outer wall
-// after it.
-TEST_CASE("Inner/Outer/Inner sandwiches a hole's outer wall beside a top surface with only one wall on top", "[Perimeters]")
+// With only one wall on top and no top surface expansion, the inner walls of a layer with a top surface are generated in
+// the band left beside it, starting from both of its edges. The wall along the top surface is still the third wall from
+// the outer wall, so every wall sequence orders it by that depth: Inner/Outer prints it before the first inner wall,
+// Outer/Inner after it, and Inner/Outer/Inner before the outer wall, with the first inner wall after it. Checked for a
+// hole's outer wall beside a top surface (collar_slab) and for a contour beside one (floored_cup).
+TEST_CASE("Walls beside a top surface keep their order by depth with only one wall on top", "[Perimeters]")
 {
+    const std::string shape         = GENERATE("hole", "contour");
+    const std::string wall_sequence = GENERATE("inner wall/outer wall", "outer wall/inner wall", "inner-outer-inner wall");
+    CAPTURE(shape, wall_sequence);
     DynamicPrintConfig config = tube_config("arachne", 3);
     config.set_deserialize_strict({
-        { "wall_sequence",         "inner-outer-inner wall" },
+        { "wall_sequence",         wall_sequence },
         { "only_one_wall_top",     true },
         { "top_shell_layers",      3 },
         { "top_surface_density",   "100%" },
@@ -1334,15 +1359,21 @@ TEST_CASE("Inner/Outer/Inner sandwiches a hole's outer wall beside a top surface
     });
     Print print;
     Model model;
-    collar_slab(print, model, config);
-    const auto layers = print.objects().front()->layers();
-    REQUIRE(layers.size() == 20);
+    if (shape == "hole")
+        collar_slab(print, model, config);
+    else
+        floored_cup(print, model, config);
 
-    // The slab's last layer, 2mm. The walls around the hole as their mean distance from its axis, in extrusion order.
-    const Layer *layer = layers[9];
-    REQUIRE(std::abs(layer->print_z - 2.) < EPSILON);
+    // The slab's last layer at 2mm, or the floor's at 1.2mm. The walls around the axis as their mean distance from it, in
+    // extrusion order.
+    const double print_z = shape == "hole" ? 2. : 1.2;
+    const Layer *layer   = nullptr;
+    for (const Layer *l : print.objects().front()->layers())
+        if (std::abs(l->print_z - print_z) < EPSILON)
+            layer = l;
+    REQUIRE(layer != nullptr);
     std::vector<double> radii;
-    int                 hole = -1;
+    int                 outer = -1;
     for (const LayerRegion *region : layer->regions())
         for (const ExtrusionEntity *entity : region->perimeters.flatten().entities) {
             const Polyline polyline = entity->as_polyline();
@@ -1353,28 +1384,30 @@ TEST_CASE("Inner/Outer/Inner sandwiches a hole's outer wall beside a top surface
             if (radius > 8.)
                 continue; // the slab's own walls
             if (entity->inset_idx == 0)
-                hole = int(radii.size());
+                outer = int(radii.size());
             radii.push_back(radius);
         }
-    REQUIRE(hole >= 0);
-    // With 0.5mm walls the first inner wall is about 0.5mm from the hole's outer wall, the third wall about 1mm.
-    const double hole_radius = radii[hole];
-    int          first_inner = 0;
-    int          third_wall  = 0;
-    for (int k = 0; k < int(radii.size()); ++ k) {
-        CAPTURE(k, radii[k], hole_radius);
-        if (k == hole)
-            continue;
-        if (radii[k] > hole_radius + 0.75) {
-            ++ third_wall;
-            CHECK(k < hole);
-        } else {
-            ++ first_inner;
-            CHECK(k > hole);
-        }
+    REQUIRE(outer >= 0);
+    // With 0.5mm walls the first inner wall is about 0.5mm from the outer wall, the third wall about 1mm. The positions
+    // in extrusion order of the first inner walls and of the third walls and beyond.
+    std::vector<int> first_inner;
+    std::vector<int> third_wall;
+    for (int k = 0; k < int(radii.size()); ++ k)
+        if (k != outer)
+            (std::abs(radii[k] - radii[outer]) > 0.75 ? third_wall : first_inner).push_back(k);
+    CAPTURE(radii, outer);
+    REQUIRE(! first_inner.empty());
+    REQUIRE(! third_wall.empty());
+    if (wall_sequence == "inner wall/outer wall") {
+        CHECK(third_wall.back() < first_inner.front());
+        CHECK(first_inner.back() < outer);
+    } else if (wall_sequence == "outer wall/inner wall") {
+        CHECK(outer < first_inner.front());
+        CHECK(first_inner.back() < third_wall.front());
+    } else {
+        CHECK(third_wall.back() < outer);
+        CHECK(outer < first_inner.front());
     }
-    CHECK(first_inner > 0);
-    CHECK(third_wall > 0);
 }
 
 // The contour's walls run in the wall direction and the hole's against it, except that the walls of a thin wall
